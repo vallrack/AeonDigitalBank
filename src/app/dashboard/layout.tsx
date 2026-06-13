@@ -41,6 +41,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth, useUser, useDoc, useFirestore } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { doc, getDocs, collection, query, limit, setDoc, serverTimestamp } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 function TopNav({ userData }: { userData: any }) {
   const { isIncognito, toggleIncognito } = useIncognito();
@@ -228,7 +230,7 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
           const usersSnap = await getDocs(query(collection(db, "users"), limit(1)));
           const isFirstUser = usersSnap.empty;
           
-          await setDoc(doc(db, "users", user.uid), {
+          const profileData = {
             uid: user.uid,
             email: user.email,
             fullName: user.displayName || user.email?.split('@')[0] || 'New User',
@@ -236,9 +238,24 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
             role: isFirstUser ? 'admin' : 'user',
             createdAt: serverTimestamp(),
             kycStatus: 'Verified'
-          });
+          };
+
+          setDoc(doc(db, "users", user.uid), profileData)
+            .catch(async (error) => {
+              const permissionError = new FirestorePermissionError({
+                path: `users/${user.uid}`,
+                operation: 'create',
+                requestResourceData: profileData
+              });
+              errorEmitter.emit('permission-error', permissionError);
+            });
         } catch (e) {
-          console.error("Error initializing profile:", e);
+          // Si el getDocs falla, probablemente es un error de permisos
+          const permissionError = new FirestorePermissionError({
+            path: 'users',
+            operation: 'list'
+          });
+          errorEmitter.emit('permission-error', permissionError);
         }
       };
       initializeProfile();

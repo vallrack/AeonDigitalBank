@@ -7,23 +7,30 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Permitir lectura de la colección para verificar si está vacía durante el registro
+    // Permitir listar usuarios para verificar si la DB está vacía y para el panel de admin
     match /users {
       allow list: if isSignedIn();
     }
 
     match /users/{userId} {
-      // Un usuario puede leer y escribir su propio perfil.
-      // Sin embargo, solo puede ponerse el rol 'admin' si es el primer usuario de la base de datos.
+      // Un usuario puede leer su propio perfil o cualquier perfil si es admin
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
+      // Permitir creación de perfil propio
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && request.auth.uid == userId && (
-        // No permitir que un usuario normal se cambie a admin
-        (request.resource.data.role == resource.data.role) || isAdmin()
+      
+      // Un usuario puede actualizar su propio perfil (excepto el rol) o un admin puede hacer todo
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId && request.resource.data.role == resource.data.role) || 
+        isAdmin()
       );
+      
+      // Solo admins pueden borrar usuarios
       allow delete: if isAdmin();
       
       match /transactions/{transactionId} {
