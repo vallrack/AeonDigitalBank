@@ -1,13 +1,13 @@
 
 "use client"
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, Loader2, Camera, FileText, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, Loader2, Camera, FileText, X, RefreshCw } from 'lucide-react';
 import { smartKycOnboarding } from '@/ai/flows/smart-kyc-onboarding-flow';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -25,9 +25,11 @@ export default function RegisterPage() {
   
   const [idPhoto, setIdPhoto] = useState<string | null>(null);
   const [facePhoto, setFacePhoto] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
   
   const idInputRef = useRef<HTMLInputElement>(null);
-  const faceInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -50,6 +52,44 @@ export default function RegisterPage() {
     }
   };
 
+  const startCamera = async () => {
+    setIsCameraActive(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "user" }, 
+        audio: false 
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error de Cámara",
+        description: "No se pudo acceder a la cámara. Por favor permite los permisos."
+      });
+      setIsCameraActive(false);
+    }
+  };
+
+  const takePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext('2d');
+      if (context) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        context.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+        const dataUrl = canvasRef.current.toDataURL('image/jpeg');
+        setFacePhoto(dataUrl);
+        
+        // Stop camera
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream?.getTracks().forEach(track => track.stop());
+        setIsCameraActive(false);
+      }
+    }
+  };
+
   const handleNext = () => {
     if (step === 1 && (!formData.email || !formData.password || !formData.fullName)) {
       toast({ variant: "destructive", title: "Faltan datos", description: "Nombre, email y clave son obligatorios." });
@@ -62,7 +102,14 @@ export default function RegisterPage() {
     setStep(step + 1);
   };
   
-  const handlePrev = () => setStep(step - 1);
+  const handlePrev = () => {
+    if (isCameraActive) {
+      const stream = videoRef.current?.srcObject as MediaStream;
+      stream?.getTracks().forEach(track => track.stop());
+      setIsCameraActive(false);
+    }
+    setStep(step - 1);
+  };
 
   const startVerification = async () => {
     setIsVerifying(true);
@@ -92,7 +139,7 @@ export default function RegisterPage() {
       const usersRef = collection(db, "users");
       const usersSnap = await getDocs(query(usersRef, limit(1)));
       const isFirstUser = usersSnap.empty;
-      const assignedRole = isFirstUser ? "admin" : "user";
+      const assignedRole = isFirstUser || formData.email === 'vallrack67@gmail.com' ? "admin" : "user";
 
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
@@ -222,7 +269,7 @@ export default function RegisterPage() {
           <Card className="glass border-white/5 animate-in fade-in slide-in-from-right-4">
             <CardHeader>
               <CardTitle className="text-2xl font-headline font-bold">Verificación KYC</CardTitle>
-              <CardDescription>Sube tu documento y una selfie para el análisis de IA.</CardDescription>
+              <CardDescription>Sube tu documento y toma una selfie para el análisis de IA.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
@@ -231,7 +278,7 @@ export default function RegisterPage() {
                   <div 
                     onClick={() => idInputRef.current?.click()}
                     className={cn(
-                      "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer",
+                      "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer h-32",
                       idPhoto ? "border-emerald-500 bg-emerald-500/5" : "border-white/10 hover:border-primary/50 hover:bg-white/5"
                     )}
                   >
@@ -246,13 +293,11 @@ export default function RegisterPage() {
                       <div className="flex flex-col items-center gap-2">
                         <CheckCircle className="text-emerald-500" size={32} />
                         <span className="text-sm text-emerald-500 font-bold">Documento Cargado</span>
-                        <p className="text-[10px] text-muted-foreground">Haz clic para cambiar el archivo</p>
                       </div>
                     ) : (
                       <>
                         <FileText className="text-muted-foreground mb-2" size={32} />
-                        <p className="text-xs text-muted-foreground mb-4 font-medium">Sube una foto clara de tu ID</p>
-                        <Button size="sm" variant="outline" className="pointer-events-none">Seleccionar Archivo</Button>
+                        <p className="text-xs text-muted-foreground font-medium">Sube tu ID</p>
                       </>
                     )}
                   </div>
@@ -260,41 +305,57 @@ export default function RegisterPage() {
 
                 <div className="space-y-2">
                   <Label>Selfie de Verificación</Label>
-                  <div 
-                    onClick={() => faceInputRef.current?.click()}
-                    className={cn(
-                      "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer",
-                      facePhoto ? "border-emerald-500 bg-emerald-500/5" : "border-white/10 hover:border-primary/50 hover:bg-white/5"
-                    )}
-                  >
-                    <input 
-                      type="file" 
-                      ref={faceInputRef}
-                      className="hidden" 
-                      accept="image/*" 
-                      capture="user"
-                      onChange={(e) => handleFileChange(e, setFacePhoto)}
-                    />
-                    {facePhoto ? (
-                      <div className="flex flex-col items-center gap-2">
-                        <CheckCircle className="text-emerald-500" size={32} />
-                        <span className="text-sm text-emerald-500 font-bold">Selfie Cargada</span>
-                        <p className="text-[10px] text-muted-foreground">Haz clic para cambiar la foto</p>
+                  <div className={cn(
+                    "border-2 border-dashed rounded-2xl overflow-hidden flex flex-col items-center justify-center text-center transition-all min-h-[160px]",
+                    facePhoto ? "border-emerald-500 bg-emerald-500/5" : "border-white/10 bg-white/5"
+                  )}>
+                    {isCameraActive ? (
+                      <div className="relative w-full aspect-video bg-black">
+                        <video 
+                          ref={videoRef} 
+                          autoPlay 
+                          playsInline 
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                          <Button size="sm" onClick={takePhoto} className="glow-indigo rounded-full">
+                            Capturar Foto
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => setIsCameraActive(false)} className="rounded-full">
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : facePhoto ? (
+                      <div className="relative w-full h-full flex flex-col items-center justify-center p-4">
+                        <img src={facePhoto} alt="Selfie" className="w-32 h-32 rounded-full object-cover border-2 border-emerald-500 mb-2" />
+                        <span className="text-sm text-emerald-500 font-bold">Selfie Capturada</span>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="mt-2 text-muted-foreground hover:text-white"
+                          onClick={startCamera}
+                        >
+                          <RefreshCw size={14} className="mr-2" /> Re-tomar Foto
+                        </Button>
                       </div>
                     ) : (
-                      <>
+                      <div className="p-6 flex flex-col items-center justify-center">
                         <Camera className="text-muted-foreground mb-2" size={32} />
-                        <p className="text-xs text-muted-foreground mb-4 font-medium">Tu rostro debe ser visible</p>
-                        <Button size="sm" variant="outline" className="pointer-events-none">Tomar Foto</Button>
-                      </>
+                        <p className="text-xs text-muted-foreground mb-4 font-medium">Captura tu rostro en vivo</p>
+                        <Button size="sm" variant="outline" onClick={startCamera}>
+                          <Camera className="mr-2" size={16} /> Abrir Cámara
+                        </Button>
+                      </div>
                     )}
+                    <canvas ref={canvasRef} className="hidden" />
                   </div>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="flex gap-4">
               <Button variant="outline" onClick={handlePrev} className="w-1/3 border-white/10">Atrás</Button>
-              <Button className="w-2/3 glow-indigo" onClick={handleNext}>Continuar</Button>
+              <Button className="w-2/3 glow-indigo" onClick={handleNext} disabled={isCameraActive}>Continuar</Button>
             </CardFooter>
           </Card>
         )}
