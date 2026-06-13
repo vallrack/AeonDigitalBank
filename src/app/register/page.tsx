@@ -11,8 +11,8 @@ import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, 
 import { smartKycOnboarding } from '@/ai/flows/smart-kyc-onboarding-flow';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, collection, getDocs, query, limit } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp, collection, getDocs, query, limit, addDoc } from 'firebase/firestore';
 import { useAuth, useFirestore } from '@/firebase';
 import { cn } from '@/lib/utils';
 
@@ -39,19 +39,17 @@ export default function RegisterPage() {
     if (!formData.email || !formData.password || !formData.fullName) {
       toast({
         variant: "destructive",
-        title: "Campos Requeridos",
-        description: "Nombre, email y contraseña son obligatorios.",
+        title: "Required Fields",
+        description: "Name, email and password are required.",
       });
       return;
     }
 
     setIsVerifying(true);
     try {
-      // Simulamos los datos de imagen para el flujo de KYC de GenAI
       const mockImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
-      // Llamada real al flujo de GenAI para validación inteligente
-      const result = await smartKycOnboarding({
+      await smartKycOnboarding({
         documentPhotoDataUri: mockImage,
         faceScanDataUri: mockImage,
         personalInformation: {
@@ -64,56 +62,59 @@ export default function RegisterPage() {
         }
       });
 
-      // Si el resultado de la IA es positivo (o forzamos para el primer registro de prueba)
-      if (result.isVerified || step === 3) {
-        // CREACIÓN REAL DEL USUARIO EN FIREBASE AUTH
-        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-        const user = userCredential.user;
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
 
-        // Lógica de Súper Admin: Verificar si es el primer usuario en Firestore
-        const usersRef = collection(db, "users");
-        const usersSnap = await getDocs(query(usersRef, limit(1)));
-        const isFirstUser = usersSnap.empty;
-        const assignedRole = isFirstUser ? "admin" : "user";
+      await updateProfile(user, { displayName: formData.fullName });
 
-        // Crear perfil en Firestore
-        await setDoc(doc(db, "users", user.uid), {
-          uid: user.uid,
-          email: formData.email,
-          fullName: formData.fullName,
-          balance: 5000.00, // Saldo inicial de cortesía
-          role: assignedRole,
-          createdAt: serverTimestamp()
-        });
+      const usersRef = collection(db, "users");
+      const usersSnap = await getDocs(query(usersRef, limit(1)));
+      const isFirstUser = usersSnap.empty;
+      const assignedRole = isFirstUser ? "admin" : "user";
 
-        toast({
-          title: assignedRole === "admin" ? "Súper Admin Configurado" : "Cuenta Creada",
-          description: assignedRole === "admin" 
-            ? "Felicidades, eres el administrador principal del sistema." 
-            : "Tu cuenta ha sido creada con éxito.",
-        });
+      // Crear perfil en Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        email: formData.email,
+        fullName: formData.fullName,
+        balance: 5000.00,
+        role: assignedRole,
+        createdAt: serverTimestamp()
+      });
 
-        setStep(4);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Fallo en Verificación IA",
-          description: result.verificationDetails || "No pudimos validar tu identidad con los datos proporcionados.",
-        });
-        setStep(1); // Volver al inicio para corregir datos
-      }
+      // Crear transacción de bienvenida
+      await addDoc(collection(db, "users", user.uid, "transactions"), {
+        userId: user.uid,
+        merchant: "Aeon Bank Welcome",
+        amount: 5000.00,
+        category: "Income",
+        status: "Completed",
+        date: new Date().toISOString(),
+        type: "income"
+      });
+
+      // Crear primera tarjeta virtual
+      await addDoc(collection(db, "users", user.uid, "virtualCards"), {
+        userId: user.uid,
+        cardHolder: formData.fullName.toUpperCase(),
+        cardNumber: "4255" + Math.floor(100000000000 + Math.random() * 900000000000).toString(),
+        expiryDate: "12/28",
+        cvv: Math.floor(100 + Math.random() * 899).toString(),
+        isFrozen: false,
+        type: "standard"
+      });
+
+      toast({
+        title: assignedRole === "admin" ? "Super Admin Configured" : "Account Created",
+        description: "Welcome to the future of banking.",
+      });
+
+      setStep(4);
     } catch (error: any) {
-      let errorMessage = "Ocurrió un error inesperado durante el registro.";
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "Este correo electrónico ya está registrado.";
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = "La contraseña es muy débil.";
-      }
-      
       toast({
         variant: "destructive",
-        title: "Error de Registro",
-        description: errorMessage,
+        title: "Registration Error",
+        description: error.message || "An error occurred during registration.",
       });
     } finally {
       setIsVerifying(false);
@@ -234,7 +235,7 @@ export default function RegisterPage() {
             </CardHeader>
             <CardContent className="space-y-4">
                <div className="text-sm text-center text-muted-foreground">
-                 Al hacer clic en finalizar, se creará tu cuenta en el sistema de Aeon Bank.
+                 Clicking finalize will create your real account and assign a precision bank account and your first virtual card.
                </div>
             </CardContent>
             <CardFooter>
@@ -246,10 +247,10 @@ export default function RegisterPage() {
                 {isVerifying ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating Account...
+                    Assigning Account...
                   </>
                 ) : (
-                  "Finalize & Create Account"
+                  "Finalize & Access AEON"
                 )}
               </Button>
             </CardFooter>
@@ -263,11 +264,11 @@ export default function RegisterPage() {
                 <CheckCircle className="text-emerald-400" size={40} />
               </div>
               <CardTitle className="text-3xl font-headline font-bold">Success!</CardTitle>
-              <CardDescription className="text-lg">Welcome to Aeon Digital Bank.</CardDescription>
+              <CardDescription className="text-lg">Your precision bank account is active.</CardDescription>
             </CardHeader>
             <CardContent className="text-center p-8">
               <p className="text-muted-foreground mb-8">
-                Your account for <strong>{formData.email}</strong> is ready.
+                Your account for <strong>{formData.email}</strong> is ready with a $5,000 credit.
               </p>
               <Button className="w-full h-14 text-lg glow-indigo font-headline" asChild>
                 <Link href="/login">Go to Login</Link>

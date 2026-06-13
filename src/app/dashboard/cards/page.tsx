@@ -1,28 +1,106 @@
+
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { VirtualCard } from '@/components/banking/virtual-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Power, ShieldAlert, Sliders, Trash2, Zap } from 'lucide-react';
+import { Plus, Power, ShieldAlert, Sliders, Trash2, Zap, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useUser, useFirestore, useCollection } from '@/firebase';
+import { collection, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function CardsPage() {
-  const [isFrozen, setIsFrozen] = useState(false);
+  const { user, loading: userLoading } = useUser();
+  const db = useFirestore();
+  const [isCreating, setIsCreating] = useState(false);
   const [limit, setLimit] = useState([1500]);
 
-  const handleFreezeToggle = () => {
-    setIsFrozen(!isFrozen);
-    toast({
-      title: isFrozen ? "Card Unfrozen" : "Card Frozen",
-      description: isFrozen ? "Your card is now active for transactions." : "Your card has been disabled temporarily.",
-    });
+  const cardsQuery = useMemo(() => {
+    if (!user) return null;
+    return collection(db, 'users', user.uid, 'virtualCards');
+  }, [db, user]);
+
+  const { data: cards, loading: cardsLoading } = useCollection(cardsQuery);
+
+  const handleCreateCard = () => {
+    if (!user) return;
+    setIsCreating(true);
+
+    const newCard = {
+      userId: user.uid,
+      cardHolder: user.displayName || user.email?.split('@')[0].toUpperCase() || 'VALUED CUSTOMER',
+      cardNumber: Array.from({ length: 4 }, () => Math.floor(1000 + Math.random() * 9000)).join(''),
+      expiryDate: '12/28',
+      cvv: Math.floor(100 + Math.random() * 899).toString(),
+      isFrozen: false,
+      type: 'standard',
+      createdAt: new Date().toISOString()
+    };
+
+    addDoc(collection(db, 'users', user.uid, 'virtualCards'), newCard)
+      .then(() => {
+        toast({
+          title: "Card Created",
+          description: "Your new virtual card is ready to use.",
+        });
+      })
+      .catch(async (error) => {
+        const permissionError = new FirestorePermissionError({
+          path: `users/${user.uid}/virtualCards`,
+          operation: 'create',
+          requestResourceData: newCard
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => setIsCreating(false));
   };
+
+  const toggleFreeze = (card: any) => {
+    if (!user) return;
+    const cardRef = doc(db, 'users', user.uid, 'virtualCards', card.id);
+    
+    updateDoc(cardRef, { isFrozen: !card.isFrozen })
+      .catch(async () => {
+        const permissionError = new FirestorePermissionError({
+          path: cardRef.path,
+          operation: 'update',
+          requestResourceData: { isFrozen: !card.isFrozen }
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
+  };
+
+  const deleteCard = (cardId: string) => {
+    if (!user) return;
+    const cardRef = doc(db, 'users', user.uid, 'virtualCards', cardId);
+    
+    deleteDoc(cardRef)
+      .then(() => {
+        toast({ title: "Card deleted" });
+      })
+      .catch(async () => {
+        const permissionError = new FirestorePermissionError({
+          path: cardRef.path,
+          operation: 'delete'
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
+  };
+
+  if (userLoading || cardsLoading) {
+    return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-primary h-10 w-10" /></div>;
+  }
+
+  const standardCards = cards.filter(c => c.type === 'standard');
+  const disposableCards = cards.filter(c => c.type === 'disposable');
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -31,8 +109,12 @@ export default function CardsPage() {
           <h1 className="text-3xl font-headline font-bold">Virtual Cards</h1>
           <p className="text-muted-foreground">Secure your online purchases with dynamic virtual cards.</p>
         </div>
-        <Button className="gap-2 glow-indigo">
-          <Plus size={16} />
+        <Button 
+          className="gap-2 glow-indigo" 
+          onClick={handleCreateCard} 
+          disabled={isCreating}
+        >
+          {isCreating ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
           Create New Card
         </Button>
       </div>
@@ -41,60 +123,55 @@ export default function CardsPage() {
         <div className="lg:col-span-5 space-y-6">
           <Tabs defaultValue="all" className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-muted/50 border border-border/50">
-              <TabsTrigger value="all">Main Cards</TabsTrigger>
-              <TabsTrigger value="disposable">Disposable</TabsTrigger>
+              <TabsTrigger value="all">Main Cards ({standardCards.length})</TabsTrigger>
+              <TabsTrigger value="disposable">Disposable ({disposableCards.length})</TabsTrigger>
             </TabsList>
-            <TabsContent value="all" className="mt-6">
-              <div className="flex justify-center mb-8">
-                <VirtualCard 
-                  cardHolder="ADRIAN DE LEON"
-                  cardNumber="4255883299014456"
-                  expiryDate="11/28"
-                  cvv="482"
-                  isFrozen={isFrozen}
-                />
-              </div>
+            <TabsContent value="all" className="mt-6 space-y-8">
+              {standardCards.length > 0 ? (
+                standardCards.map(card => (
+                  <div key={card.id} className="flex flex-col items-center gap-4">
+                    <VirtualCard 
+                      cardHolder={card.cardHolder}
+                      cardNumber={card.cardNumber}
+                      expiryDate={card.expiryDate}
+                      cvv={card.cvv}
+                      isFrozen={card.isFrozen}
+                    />
+                    <div className="flex gap-2 w-full max-w-sm">
+                      <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={() => toggleFreeze(card)}>
+                        <Power size={14} /> {card.isFrozen ? 'Unfreeze' : 'Freeze'}
+                      </Button>
+                      <Button variant="outline" size="sm" className="flex-1 gap-2 text-destructive" onClick={() => deleteCard(card.id)}>
+                        <Trash2 size={14} /> Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center p-12 border-2 border-dashed rounded-2xl border-white/5">
+                  <p className="text-muted-foreground">You don't have any virtual cards yet.</p>
+                </div>
+              )}
             </TabsContent>
             <TabsContent value="disposable" className="mt-6">
-              <div className="flex justify-center mb-8">
-                <VirtualCard 
-                  cardHolder="ONE TIME USE"
-                  cardNumber="5512773188203312"
-                  expiryDate="12/23"
-                  cvv="911"
-                  type="disposable"
-                />
-              </div>
+              {disposableCards.length > 0 ? (
+                disposableCards.map(card => (
+                  <VirtualCard 
+                    key={card.id}
+                    cardHolder={card.cardHolder}
+                    cardNumber={card.cardNumber}
+                    expiryDate={card.expiryDate}
+                    cvv={card.cvv}
+                    type="disposable"
+                  />
+                ))
+              ) : (
+                <div className="text-center p-12 border-2 border-dashed rounded-2xl border-white/5">
+                  <p className="text-muted-foreground">No disposable cards available.</p>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
-
-          <Card className="glass border-primary/5">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-headline uppercase tracking-widest text-muted-foreground">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <Button 
-                variant={isFrozen ? "default" : "outline"} 
-                className={cn("flex-col h-20 gap-2", isFrozen && "bg-emerald-600 hover:bg-emerald-500")}
-                onClick={handleFreezeToggle}
-              >
-                <Power size={20} />
-                {isFrozen ? "Unfreeze" : "Freeze Card"}
-              </Button>
-              <Button variant="outline" className="flex-col h-20 gap-2">
-                <ShieldAlert size={20} />
-                Report Lost
-              </Button>
-              <Button variant="outline" className="flex-col h-20 gap-2">
-                <Zap size={20} />
-                Renew CVV
-              </Button>
-              <Button variant="outline" className="flex-col h-20 gap-2 text-destructive hover:text-destructive">
-                <Trash2 size={20} />
-                Delete Card
-              </Button>
-            </CardContent>
-          </Card>
         </div>
 
         <div className="lg:col-span-7 space-y-6">
@@ -104,7 +181,7 @@ export default function CardsPage() {
                 <Sliders className="text-primary" size={20} />
                 <CardTitle className="text-xl font-headline font-bold">Card Management</CardTitle>
               </div>
-              <CardDescription>Configure spending limits and security policies for this card.</CardDescription>
+              <CardDescription>Configure spending limits and security policies.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
               <div className="space-y-4">
@@ -139,30 +216,9 @@ export default function CardsPage() {
                   </div>
                   <Switch />
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">ATM Withdrawals</Label>
-                    <p className="text-sm text-muted-foreground">Allow cash withdrawals from physical ATMs.</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
               </div>
 
               <Button className="w-full glow-indigo mt-4">Save Configuration</Button>
-            </CardContent>
-          </Card>
-
-          <Card className="glass border-primary/5 overflow-hidden">
-            <div className="bg-primary/5 p-4 flex items-center justify-between border-b border-primary/10">
-              <div className="flex items-center gap-2">
-                <Zap size={16} className="text-accent" />
-                <span className="text-sm font-bold font-headline">Smart Security Tip</span>
-              </div>
-            </div>
-            <CardContent className="pt-4">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Your virtual card generates a <span className="text-accent font-semibold">Dynamic CVV</span> every 5 minutes. This prevents card-not-present fraud, as hackers cannot reuse your CVV for future unauthorized charges.
-              </p>
             </CardContent>
           </Card>
         </div>

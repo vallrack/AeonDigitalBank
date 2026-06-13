@@ -1,3 +1,4 @@
+
 "use client"
 
 import React from 'react';
@@ -5,7 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PrivacyMask } from '@/components/incognito-context';
 import { TrendingUp, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
-export function BalanceWidget() {
+interface BalanceWidgetProps {
+  balance?: number;
+}
+
+export function BalanceWidget({ balance = 0 }: BalanceWidgetProps) {
   return (
     <Card className="glass overflow-hidden relative border-primary/10">
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl" />
@@ -19,12 +24,12 @@ export function BalanceWidget() {
         <div className="flex flex-col gap-1">
           <div className="text-3xl font-headline font-bold flex items-baseline gap-1">
             <span className="text-accent">$</span>
-            <PrivacyMask className="text-4xl">42,850.24</PrivacyMask>
+            <PrivacyMask className="text-4xl">{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</PrivacyMask>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="text-emerald-400 flex items-center gap-0.5 font-medium">
               <TrendingUp size={12} />
-              +12.5%
+              +0.0%
             </span>
             <span className="text-muted-foreground">vs last month</span>
           </div>
@@ -37,7 +42,7 @@ export function BalanceWidget() {
               Income
             </div>
             <div className="text-lg font-headline font-semibold">
-              <PrivacyMask>$12,450</PrivacyMask>
+              <PrivacyMask>${balance.toLocaleString()}</PrivacyMask>
             </div>
           </div>
           <div>
@@ -46,7 +51,7 @@ export function BalanceWidget() {
               Expenses
             </div>
             <div className="text-lg font-headline font-semibold">
-              <PrivacyMask>$3,820</PrivacyMask>
+              <PrivacyMask>$0</PrivacyMask>
             </div>
           </div>
         </div>
