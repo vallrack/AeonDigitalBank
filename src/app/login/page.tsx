@@ -38,8 +38,6 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
-      // Firebase requiere un email válido. Si intentas con "Vallrack", fallará.
-      // Debe ser algo como vallrack@aeon.com
       await signInWithEmailAndPassword(auth, email, password);
       toast({
         title: "Acceso concedido",
@@ -47,11 +45,16 @@ export default function LoginPage() {
       });
       router.push('/dashboard');
     } catch (error: any) {
-      // No usamos console.error para evitar el overlay de error de NextJS en desarrollo
       let msg = "Credenciales inválidas. Por favor, verifica tus datos.";
-      if (error.code === 'auth/invalid-email') {
-        msg = "El formato del email no es válido. Ejemplo: usuario@aeon.com";
+      
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        msg = "No encontramos esta cuenta. ¿Ya te has registrado?";
+      } else if (error.code === 'auth/wrong-password') {
+        msg = "La contraseña es incorrecta.";
+      } else if (error.code === 'auth/invalid-email') {
+        msg = "El formato del email no es válido.";
       }
+
       setErrorMessage(msg);
       toast({
         variant: "destructive",
@@ -95,13 +98,12 @@ export default function LoginPage() {
               <Input 
                 id="email" 
                 type="email" 
-                placeholder="vallrack@aeon.com" 
+                placeholder="vallrack67@gmail.com" 
                 className="bg-white/5 border-white/10" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
-              <p className="text-[10px] text-muted-foreground italic">Nota: Use un formato de email (ej: vallrack@aeon.com)</p>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
@@ -145,7 +147,7 @@ export default function LoginPage() {
               )}
             </Button>
             <div className="text-center text-sm text-muted-foreground">
-              Don't have an account? <Link href="/register" className="text-primary hover:text-accent font-medium">Get Started</Link>
+              Don't have an account? <Link href="/register" className="text-primary hover:text-accent font-medium">Get Started / Register</Link>
             </div>
           </CardFooter>
         </form>
