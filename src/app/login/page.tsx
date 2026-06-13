@@ -2,14 +2,56 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useAuth } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Shield, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Shield, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const auth = useAuth();
+  const router = useRouter();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      toast({
+        variant: "destructive",
+        title: "Campos incompletos",
+        description: "Por favor, introduce tu email y contraseña.",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Nota: Firebase requiere un formato de email válido. 
+      // Si "Vallrack" no es un email, asegúrate de registrarlo como vallrack@ejemplo.com o similar.
+      await signInWithEmailAndPassword(auth, email, password);
+      toast({
+        title: "Acceso concedido",
+        description: "Bienvenido a Aeon Digital Bank.",
+      });
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        variant: "destructive",
+        title: "Error de inicio de sesión",
+        description: "Credenciales inválidas. Por favor, verifica tus datos.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0E1016] flex flex-col items-center justify-center p-6">
@@ -26,45 +68,70 @@ export default function LoginPage() {
       </div>
 
       <Card className="w-full max-w-md glass border-white/5">
-        <CardHeader>
-          <CardTitle className="text-xl font-headline">Welcome Back</CardTitle>
-          <CardDescription>Enter your credentials to access your account.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input id="email" type="email" placeholder="name@example.com" className="bg-white/5 border-white/10" />
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <Label htmlFor="password">Password</Label>
-              <Link href="#" className="text-xs text-primary hover:text-accent">Forgot Password?</Link>
-            </div>
-            <div className="relative">
+        <form onSubmit={handleLogin}>
+          <CardHeader>
+            <CardTitle className="text-xl font-headline">Welcome Back</CardTitle>
+            <CardDescription>Enter your credentials to access your account.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
               <Input 
-                id="password" 
-                type={showPassword ? "text" : "password"} 
-                className="bg-white/5 border-white/10 pr-10" 
+                id="email" 
+                type="text" 
+                placeholder="name@example.com" 
+                className="bg-white/5 border-white/10" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
               />
-              <button 
-                className="absolute right-3 top-2.5 text-muted-foreground hover:text-white"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
             </div>
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-4">
-          <Button className="w-full glow-indigo group" asChild>
-            <Link href="/dashboard">
-              Sign In <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
-            </Link>
-          </Button>
-          <div className="text-center text-sm text-muted-foreground">
-            Don't have an account? <Link href="/register" className="text-primary hover:text-accent font-medium">Get Started</Link>
-          </div>
-        </CardFooter>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label htmlFor="password">Password</Label>
+                <Link href="#" className="text-xs text-primary hover:text-accent">Forgot Password?</Link>
+              </div>
+              <div className="relative">
+                <Input 
+                  id="password" 
+                  type={showPassword ? "text" : "password"} 
+                  className="bg-white/5 border-white/10 pr-10" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button 
+                  type="button"
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-white"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-4">
+            <Button 
+              type="submit" 
+              className="w-full glow-indigo group" 
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Authenticating...
+                </>
+              ) : (
+                <>
+                  Sign In <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
+                </>
+              )}
+            </Button>
+            <div className="text-center text-sm text-muted-foreground">
+              Don't have an account? <Link href="/register" className="text-primary hover:text-accent font-medium">Get Started</Link>
+            </div>
+          </CardFooter>
+        </form>
       </Card>
 
       <div className="mt-8 flex items-center gap-2 text-xs text-muted-foreground font-headline">
