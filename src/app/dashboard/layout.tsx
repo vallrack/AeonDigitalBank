@@ -45,6 +45,9 @@ import { useFirestore } from '@/firebase';
 function TopNav() {
   const { isIncognito, toggleIncognito } = useIncognito();
   const { user } = useUser();
+  const db = useFirestore();
+  const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
+  const { data: userData } = useDoc(userRef);
   
   return (
     <header className="h-16 border-b flex items-center justify-between px-6 bg-background/50 backdrop-blur-md sticky top-0 z-40">
@@ -60,6 +63,11 @@ function TopNav() {
       </div>
 
       <div className="flex items-center gap-2">
+        {userData?.role === 'admin' && (
+          <div className="hidden md:flex items-center px-3 py-1 bg-accent/10 border border-accent/20 rounded-full text-[10px] font-bold text-accent uppercase tracking-tighter mr-2">
+            Admin Mode
+          </div>
+        )}
         <Button 
           variant="ghost" 
           size="icon" 
@@ -115,13 +123,13 @@ function DashboardSidebar() {
   const isAdmin = userData?.role === 'admin';
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border/50">
+    <Sidebar className="border-r border-border/50">
       <SidebarHeader className="h-16 flex items-center px-4">
         <Link href="/dashboard" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
             <span className="text-primary-foreground font-headline font-bold">A</span>
           </div>
-          <span className="font-headline font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">
+          <span className="font-headline font-bold text-lg tracking-tight">
             AEON <span className="text-accent">BANK</span>
           </span>
         </Link>
@@ -183,6 +191,7 @@ function DashboardSidebar() {
                     asChild 
                     isActive={pathname === item.href}
                     tooltip={item.label}
+                    className={pathname === item.href ? "bg-muted/50 text-foreground" : ""}
                   >
                     <Link href={item.href}>
                       <item.icon />
@@ -215,7 +224,7 @@ function DashboardSidebar() {
 export default function RootDashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <IncognitoProvider>
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={true}>
         <DashboardSidebar />
         <SidebarInset>
           <TopNav />
