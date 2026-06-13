@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, Loader2, Camera, FileText, X, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, Loader2, Camera, FileText, X, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { useAuth, useFirestore } from '@/firebase';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -161,11 +162,18 @@ export default function RegisterPage() {
 
       setStep(4);
     } catch (error: any) {
-      console.error("Registration finalization error:", error);
+      console.error("Registration error:", error);
+      
+      let errorMessage = "No se pudo completar la activación de la cuenta.";
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "Este correo ya está registrado. Por favor, intenta iniciar sesión.";
+      }
+
       toast({
         variant: "destructive",
         title: "Error de Registro",
-        description: error.message || "No se pudo completar la activación de la cuenta.",
+        description: errorMessage,
       });
     } finally {
       setIsVerifying(false);
