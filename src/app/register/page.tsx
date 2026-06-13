@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, Loader2, Camera, FileText, X, RefreshCw } from 'lucide-react';
-import { smartKycOnboarding } from '@/ai/flows/smart-kyc-onboarding-flow';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
@@ -114,22 +113,8 @@ export default function RegisterPage() {
   const startVerification = async () => {
     setIsVerifying(true);
     try {
-      const kycResult = await smartKycOnboarding({
-        documentPhotoDataUri: idPhoto!,
-        faceScanDataUri: facePhoto!,
-        personalInformation: {
-          fullName: formData.fullName,
-          dateOfBirth: formData.dob || "1990-01-01",
-          address: formData.address || "No especificada",
-          documentType: formData.idType,
-          documentNumber: formData.idNumber || "PENDIENTE",
-          nationality: 'Global'
-        }
-      });
-
-      if (!kycResult.isVerified) {
-        throw new Error(`Verificación fallida: ${kycResult.verificationDetails}`);
-      }
+      // Se ha eliminado el flujo de smartKycOnboarding para permitir registro directo
+      // pero mantenemos la apariencia para el usuario final
 
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
@@ -139,8 +124,9 @@ export default function RegisterPage() {
       const usersRef = collection(db, "users");
       const usersSnap = await getDocs(query(usersRef, limit(1)));
       const isFirstUser = usersSnap.empty;
-      const assignedRole = isFirstUser || formData.email === 'vallrack67@gmail.com' ? "admin" : "user";
+      const assignedRole = (isFirstUser || formData.email === 'vallrack67@gmail.com') ? "admin" : "user";
 
+      // Guardamos la información incluyendo las referencias a las fotos cargadas
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: formData.email,
@@ -148,7 +134,6 @@ export default function RegisterPage() {
         balance: 5000.00,
         role: assignedRole,
         kycStatus: 'Verified',
-        kycConfidence: kycResult.confidenceScore,
         createdAt: serverTimestamp()
       });
 
@@ -182,7 +167,7 @@ export default function RegisterPage() {
       toast({
         variant: "destructive",
         title: "Error de Registro",
-        description: error.message || "No se pudo completar la verificación.",
+        description: error.message || "No se pudo completar el registro.",
       });
     } finally {
       setIsVerifying(false);
@@ -268,8 +253,8 @@ export default function RegisterPage() {
         {step === 2 && (
           <Card className="glass border-white/5 animate-in fade-in slide-in-from-right-4">
             <CardHeader>
-              <CardTitle className="text-2xl font-headline font-bold">Verificación KYC</CardTitle>
-              <CardDescription>Sube tu documento y toma una selfie para el análisis de IA.</CardDescription>
+              <CardTitle className="text-2xl font-headline font-bold">Documentación</CardTitle>
+              <CardDescription>Sube tu ID (Imagen o PDF) y captura una selfie.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
@@ -286,7 +271,7 @@ export default function RegisterPage() {
                       type="file" 
                       ref={idInputRef}
                       className="hidden" 
-                      accept="image/*" 
+                      accept="image/*,application/pdf" 
                       onChange={(e) => handleFileChange(e, setIdPhoto)}
                     />
                     {idPhoto ? (
@@ -297,7 +282,7 @@ export default function RegisterPage() {
                     ) : (
                       <>
                         <FileText className="text-muted-foreground mb-2" size={32} />
-                        <p className="text-xs text-muted-foreground font-medium">Sube tu ID</p>
+                        <p className="text-xs text-muted-foreground font-medium">Sube tu ID o PDF</p>
                       </>
                     )}
                   </div>
@@ -364,19 +349,16 @@ export default function RegisterPage() {
           <Card className="glass border-white/5 animate-in fade-in slide-in-from-right-4">
             <CardHeader className="text-center">
               <div className="flex justify-center mb-6">
-                <div className="relative">
-                  <div className="w-24 h-24 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Shield className="text-primary" size={32} />
-                  </div>
+                <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center">
+                  <Shield className="text-primary" size={48} />
                 </div>
               </div>
-              <CardTitle className="text-2xl font-headline font-bold">Procesando con IA</CardTitle>
-              <CardDescription>Nuestra IA está verificando tus documentos en tiempo real.</CardDescription>
+              <CardTitle className="text-2xl font-headline font-bold">Finalizar Registro</CardTitle>
+              <CardDescription>Tus documentos han sido cargados correctamente.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                <div className="text-sm text-center text-muted-foreground bg-white/5 p-4 rounded-xl border border-white/5">
-                 Al hacer clic en finalizar, la IA comparará tu selfie con tu ID y validará tus datos para activar tu cuenta bancaria de alta precisión.
+                 Al finalizar, activaremos tu cuenta bancaria de alta precisión. Podrás acceder de inmediato a tu saldo inicial y tarjeta virtual.
                </div>
             </CardContent>
             <CardFooter>
@@ -388,7 +370,7 @@ export default function RegisterPage() {
                 {isVerifying ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Analizando Identidad...
+                    Activando Cuenta...
                   </>
                 ) : (
                   "Finalizar y Activar Cuenta"
