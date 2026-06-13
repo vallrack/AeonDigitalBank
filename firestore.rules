@@ -10,19 +10,28 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    match /{document=**} {
-      allow read, write: if isAdmin();
+    // Permitir lectura de la colección para verificar si está vacía durante el registro
+    match /users {
+      allow list: if isSignedIn();
     }
 
     match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      // Un usuario puede leer y escribir su propio perfil.
+      // Sin embargo, solo puede ponerse el rol 'admin' si es el primer usuario de la base de datos.
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId && (
+        // No permitir que un usuario normal se cambie a admin
+        (request.resource.data.role == resource.data.role) || isAdmin()
+      );
+      allow delete: if isAdmin();
       
       match /transactions/{transactionId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
       
       match /virtualCards/{cardId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
   }

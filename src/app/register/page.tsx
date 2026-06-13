@@ -12,7 +12,7 @@ import { smartKycOnboarding } from '@/ai/flows/smart-kyc-onboarding-flow';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, getDocs, query, limit } from 'firebase/firestore';
 import { useAuth, useFirestore } from '@/firebase';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +25,7 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
-    password: '', // Añadido para registro real
+    password: '',
     dob: '',
     address: '',
     idType: 'Passport',
@@ -65,18 +65,31 @@ export default function RegisterPage() {
       });
 
       if (result.isVerified) {
-        // REGISTRO REAL EN FIREBASE TRAS KYC EXITOSO
+        // REGISTRO REAL EN FIREBASE
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         const user = userCredential.user;
+
+        // Lógica de Súper Admin: Verificar si es el primer usuario
+        const usersRef = collection(db, "users");
+        const usersSnap = await getDocs(query(usersRef, limit(1)));
+        const isFirstUser = usersSnap.empty;
+        const assignedRole = isFirstUser ? "admin" : "user";
 
         // Crear perfil en Firestore
         await setDoc(doc(db, "users", user.uid), {
           uid: user.uid,
           email: formData.email,
           fullName: formData.fullName,
-          balance: 1000.00, // Bono de bienvenida
-          role: "user",
+          balance: 1000.00,
+          role: assignedRole,
           createdAt: serverTimestamp()
+        });
+
+        toast({
+          title: assignedRole === "admin" ? "Súper Admin Creado" : "Cuenta Creada",
+          description: assignedRole === "admin" 
+            ? "Has sido registrado como el primer administrador del sistema." 
+            : "Tu cuenta de cliente ha sido configurada correctamente.",
         });
 
         setStep(4);
