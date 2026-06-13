@@ -1,0 +1,67 @@
+
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Información del perfil del usuario y saldo actual.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "fullName": { "type": "string" },
+        "balance": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "fullName", "balance"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Detalle de un movimiento financiero.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "merchant": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["Completed", "Pending", "Failed"] },
+        "date": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["income", "expense"] }
+      },
+      "required": ["id", "userId", "merchant", "amount", "category", "status", "date", "type"]
+    },
+    "VirtualCard": {
+      "title": "Virtual Card",
+      "description": "Tarjeta virtual generada por el usuario.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "cardHolder": { "type": "string" },
+        "cardNumber": { "type": "string" },
+        "expiryDate": { "type": "string" },
+        "cvv": { "type": "string" },
+        "isFrozen": { "type": "boolean" },
+        "type": { "type": "string", "enum": ["standard", "disposable"] }
+      },
+      "required": ["id", "userId", "cardHolder", "cardNumber", "expiryDate", "cvv", "isFrozen", "type"]
+    }
+  },
+  "auth": {
+    "providers": ["password", "google.com"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Documento de perfil del usuario."
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Historial de transacciones del usuario."
+    },
+    "/users/{userId}/virtualCards/{cardId}": {
+      "schema": { "$ref": "#/entities/VirtualCard" },
+      "description": "Tarjetas virtuales asoci Parecidas a la del usuario."
+    }
+  }
+}
