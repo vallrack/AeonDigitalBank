@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, Loader2, Camera, FileText } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, Loader2, Camera, FileText, X } from 'lucide-react';
 import { smartKycOnboarding } from '@/ai/flows/smart-kyc-onboarding-flow';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -25,6 +25,9 @@ export default function RegisterPage() {
   
   const [idPhoto, setIdPhoto] = useState<string | null>(null);
   const [facePhoto, setFacePhoto] = useState<string | null>(null);
+  
+  const idInputRef = useRef<HTMLInputElement>(null);
+  const faceInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -64,7 +67,6 @@ export default function RegisterPage() {
   const startVerification = async () => {
     setIsVerifying(true);
     try {
-      // 1. Ejecutar el flujo de IA con las imágenes reales en Base64
       const kycResult = await smartKycOnboarding({
         documentPhotoDataUri: idPhoto!,
         faceScanDataUri: facePhoto!,
@@ -82,19 +84,16 @@ export default function RegisterPage() {
         throw new Error(`Verificación fallida: ${kycResult.verificationDetails}`);
       }
 
-      // 2. Crear usuario en Auth
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
       await updateProfile(user, { displayName: formData.fullName });
 
-      // 3. Determinar rol (el primero es admin)
       const usersRef = collection(db, "users");
       const usersSnap = await getDocs(query(usersRef, limit(1)));
       const isFirstUser = usersSnap.empty;
       const assignedRole = isFirstUser ? "admin" : "user";
 
-      // 4. Guardar perfil en Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: formData.email,
@@ -106,7 +105,6 @@ export default function RegisterPage() {
         createdAt: serverTimestamp()
       });
 
-      // 5. Transacción de bienvenida
       await addDoc(collection(db, "users", user.uid, "transactions"), {
         userId: user.uid,
         merchant: "Aeon Bank Welcome Bonus",
@@ -117,7 +115,6 @@ export default function RegisterPage() {
         type: "income"
       });
 
-      // 6. Primera tarjeta virtual
       await addDoc(collection(db, "users", user.uid, "virtualCards"), {
         userId: user.uid,
         cardHolder: formData.fullName.toUpperCase(),
@@ -231,27 +228,31 @@ export default function RegisterPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Documento de Identidad (ID/Pasaporte)</Label>
-                  <div className={cn(
-                    "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-colors relative overflow-hidden",
-                    idPhoto ? "border-primary bg-primary/5" : "border-white/10 hover:border-primary/50"
-                  )}>
+                  <div 
+                    onClick={() => idInputRef.current?.click()}
+                    className={cn(
+                      "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer",
+                      idPhoto ? "border-emerald-500 bg-emerald-500/5" : "border-white/10 hover:border-primary/50 hover:bg-white/5"
+                    )}
+                  >
+                    <input 
+                      type="file" 
+                      ref={idInputRef}
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={(e) => handleFileChange(e, setIdPhoto)}
+                    />
                     {idPhoto ? (
                       <div className="flex flex-col items-center gap-2">
-                        <CheckCircle className="text-primary" size={24} />
-                        <span className="text-xs text-primary font-medium">Documento Cargado</span>
-                        <Button variant="ghost" size="xs" onClick={() => setIdPhoto(null)} className="h-6 text-[10px]">Cambiar</Button>
+                        <CheckCircle className="text-emerald-500" size={32} />
+                        <span className="text-sm text-emerald-500 font-bold">Documento Cargado</span>
+                        <p className="text-[10px] text-muted-foreground">Haz clic para cambiar el archivo</p>
                       </div>
                     ) : (
                       <>
-                        <FileText className="text-muted-foreground mb-2" size={24} />
-                        <p className="text-xs text-muted-foreground mb-2">Sube una foto clara de tu ID</p>
-                        <Input 
-                          type="file" 
-                          accept="image/*" 
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={(e) => handleFileChange(e, setIdPhoto)}
-                        />
-                        <Button size="sm" variant="outline">Seleccionar Archivo</Button>
+                        <FileText className="text-muted-foreground mb-2" size={32} />
+                        <p className="text-xs text-muted-foreground mb-4 font-medium">Sube una foto clara de tu ID</p>
+                        <Button size="sm" variant="outline" className="pointer-events-none">Seleccionar Archivo</Button>
                       </>
                     )}
                   </div>
@@ -259,27 +260,32 @@ export default function RegisterPage() {
 
                 <div className="space-y-2">
                   <Label>Selfie de Verificación</Label>
-                  <div className={cn(
-                    "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-colors relative overflow-hidden",
-                    facePhoto ? "border-primary bg-primary/5" : "border-white/10 hover:border-primary/50"
-                  )}>
+                  <div 
+                    onClick={() => faceInputRef.current?.click()}
+                    className={cn(
+                      "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer",
+                      facePhoto ? "border-emerald-500 bg-emerald-500/5" : "border-white/10 hover:border-primary/50 hover:bg-white/5"
+                    )}
+                  >
+                    <input 
+                      type="file" 
+                      ref={faceInputRef}
+                      className="hidden" 
+                      accept="image/*" 
+                      capture="user"
+                      onChange={(e) => handleFileChange(e, setFacePhoto)}
+                    />
                     {facePhoto ? (
                       <div className="flex flex-col items-center gap-2">
-                        <CheckCircle className="text-primary" size={24} />
-                        <span className="text-xs text-primary font-medium">Selfie Cargada</span>
-                        <Button variant="ghost" size="xs" onClick={() => setFacePhoto(null)} className="h-6 text-[10px]">Cambiar</Button>
+                        <CheckCircle className="text-emerald-500" size={32} />
+                        <span className="text-sm text-emerald-500 font-bold">Selfie Cargada</span>
+                        <p className="text-[10px] text-muted-foreground">Haz clic para cambiar la foto</p>
                       </div>
                     ) : (
                       <>
-                        <Camera className="text-muted-foreground mb-2" size={24} />
-                        <p className="text-xs text-muted-foreground mb-2">Tu rostro debe ser visible</p>
-                        <Input 
-                          type="file" 
-                          accept="image/*" 
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={(e) => handleFileChange(e, setFacePhoto)}
-                        />
-                        <Button size="sm" variant="outline">Tomar Foto</Button>
+                        <Camera className="text-muted-foreground mb-2" size={32} />
+                        <p className="text-xs text-muted-foreground mb-4 font-medium">Tu rostro debe ser visible</p>
+                        <Button size="sm" variant="outline" className="pointer-events-none">Tomar Foto</Button>
                       </>
                     )}
                   </div>
