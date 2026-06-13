@@ -1,3 +1,16 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero-bank",
+      "description": "Abstract futuristic banking visualization",
+      "imageUrl": "https://picsum.photos/seed/aeon1/1200/800",
+      "imageHint": "digital banking"
+    },
+    {
+      "id": "user-avatar",
+      "description": "Generic user profile",
+      "imageUrl": "https://picsum.photos/seed/aeonuser/200/200",
+      "imageHint": "professional avatar"
+    }
+  ]
 }
