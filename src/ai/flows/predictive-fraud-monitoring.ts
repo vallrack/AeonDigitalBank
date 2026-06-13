@@ -30,8 +30,8 @@ const PredictiveFraudMonitoringInputSchema = z.object({
         .max(20)
         .describe('Recent transaction history for the user (up to 20 transactions).'),
       knownLocations: z.array(z.string()).describe('List of known geographic locations for the user.'),
-      averageTransactionAmount: z.number().optional().describe('User\u0027s average transaction amount.'),
-      dailySpendLimit: z.number().optional().describe('User\u0027s daily spending limit.'),
+      averageTransactionAmount: z.number().optional().describe('User\'s average transaction amount.'),
+      dailySpendLimit: z.number().optional().describe('User\'s daily spending limit.'),
     })
     .describe('Contextual information about the user, including historical data.'),
 });
@@ -45,7 +45,7 @@ const PredictiveFraudMonitoringOutputSchema = z.object({
     .min(0)
     .max(1)
     .optional()
-    .describe('A score (0.0 to 1.0) indicating the AI\u0027s confidence in its assessment.'),
+    .describe('A score (0.0 to 1.0) indicating the AI\'s confidence in its assessment.'),
   alertLevel: z
     .enum(['None', 'Low', 'Medium', 'High'])
     .describe('The severity level of the alert if the transaction is suspicious.'),
@@ -92,4 +92,20 @@ Based on the above information, identify if the current transaction is suspiciou
 
 If the transaction is suspicious, set 'isSuspicious' to 'true', provide a clear 'reason' for flagging it, assign a 'confidenceScore' between 0.0 and 1.0, and set an 'alertLevel' ('Low', 'Medium', 'High'). If not suspicious, set 'isSuspicious' to 'false', 'reason' to 'No suspicious activity detected.', and 'alertLevel' to 'None'.
 
-Ensure your output is a JSON object conforming strictly to the 'PredictiveFraudMonitoringOutputSchema'.
+Ensure your output is a JSON object conforming strictly to the 'PredictiveFraudMonitoringOutputSchema'.`,
+});
+
+const predictiveFraudMonitoringFlow = ai.defineFlow(
+  {
+    name: 'predictiveFraudMonitoringFlow',
+    inputSchema: PredictiveFraudMonitoringInputSchema,
+    outputSchema: PredictiveFraudMonitoringOutputSchema,
+  },
+  async (input) => {
+    const {output} = await predictiveFraudMonitoringPrompt(input);
+    if (!output) {
+      throw new Error('AI prompt did not return any output for fraud monitoring.');
+    }
+    return output;
+  }
+);

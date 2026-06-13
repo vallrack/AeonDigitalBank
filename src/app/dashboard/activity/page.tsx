@@ -1,12 +1,12 @@
-
 "use client"
 
 import React, { useMemo, useState } from 'react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, limit, DocumentData } from 'firebase/firestore';
+import { collection, query, orderBy, DocumentData } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Filter, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react';
 import { PrivacyMask } from '@/components/incognito-context';
