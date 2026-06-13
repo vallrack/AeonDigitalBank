@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState } from 'react';
@@ -10,14 +11,21 @@ import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, 
 import { smartKycOnboarding } from '@/ai/flows/smart-kyc-onboarding-flow';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuth, useFirestore } from '@/firebase';
+import { cn } from '@/lib/utils';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const auth = useAuth();
+  const db = useFirestore();
   const [step, setStep] = useState(1);
   const [isVerifying, setIsVerifying] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
+    password: '', // Añadido para registro real
     dob: '',
     address: '',
     idType: 'Passport',
@@ -28,9 +36,18 @@ export default function RegisterPage() {
   const handlePrev = () => setStep(step - 1);
 
   const startVerification = async () => {
+    if (!formData.email || !formData.password) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Email y contraseña son obligatorios.",
+      });
+      return;
+    }
+
     setIsVerifying(true);
     try {
-      // In a real app, these would be data URIs from file inputs
+      // Simulación de KYC con GenAI
       const mockDocument = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
       const mockFace = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -48,6 +65,20 @@ export default function RegisterPage() {
       });
 
       if (result.isVerified) {
+        // REGISTRO REAL EN FIREBASE TRAS KYC EXITOSO
+        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+        const user = userCredential.user;
+
+        // Crear perfil en Firestore
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          email: formData.email,
+          fullName: formData.fullName,
+          balance: 1000.00, // Bono de bienvenida
+          role: "user",
+          createdAt: serverTimestamp()
+        });
+
         setStep(4);
       } else {
         toast({
@@ -57,11 +88,15 @@ export default function RegisterPage() {
         });
         setStep(2);
       }
-    } catch (error) {
+    } catch (error: any) {
+      let errorMessage = "An unexpected error occurred during KYC processing.";
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "Este email ya está en uso.";
+      }
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred during KYC processing.",
+        title: "Error de Registro",
+        description: errorMessage,
       });
     } finally {
       setIsVerifying(false);
@@ -114,16 +149,29 @@ export default function RegisterPage() {
                   onChange={(e) => setFormData({...formData, fullName: e.target.value})}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="john@example.com" 
-                  className="bg-white/5 border-white/10"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="john@example.com" 
+                    className="bg-white/5 border-white/10"
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    placeholder="••••••••" 
+                    className="bg-white/5 border-white/10"
+                    value={formData.password}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -250,7 +298,7 @@ export default function RegisterPage() {
             </CardHeader>
             <CardContent className="text-center p-8">
               <p className="text-muted-foreground mb-8 leading-relaxed">
-                Your identity has been successfully verified. You now have full access to Aeon Digital Bank's features including virtual cards and instant transfers.
+                Your account for <strong>{formData.email}</strong> has been successfully created. You now have full access to Aeon Digital Bank's features.
               </p>
               <Button className="w-full h-14 text-lg glow-indigo font-headline" asChild>
                 <Link href="/dashboard">Enter Your Dashboard</Link>

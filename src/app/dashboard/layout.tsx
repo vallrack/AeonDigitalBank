@@ -1,3 +1,4 @@
+
 "use client"
 
 import React from 'react';
@@ -31,10 +32,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { IncognitoProvider, useIncognito } from '@/components/incognito-context';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth, useUser } from '@/firebase';
+import { signOut } from 'firebase/auth';
 
 function TopNav() {
   const { isIncognito, toggleIncognito } = useIncognito();
+  const { user } = useUser();
   
   return (
     <header className="h-16 border-b flex items-center justify-between px-6 bg-background/50 backdrop-blur-md sticky top-0 z-40">
@@ -63,8 +67,8 @@ function TopNav() {
           <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full" />
         </Button>
         <Avatar className="h-8 w-8 border border-primary/20">
-          <AvatarImage src="https://picsum.photos/seed/aeonuser/100/100" />
-          <AvatarFallback>AD</AvatarFallback>
+          <AvatarImage src={`https://picsum.photos/seed/${user?.uid || 'aeon'}/100/100`} />
+          <AvatarFallback>{user?.email?.substring(0,2).toUpperCase() || 'AD'}</AvatarFallback>
         </Avatar>
       </div>
     </header>
@@ -73,6 +77,17 @@ function TopNav() {
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const auth = useAuth();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      router.push('/login');
+    } catch (error) {
+      console.error("Error signing out", error);
+    }
+  };
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
@@ -118,7 +133,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <SidebarFooter className="p-4">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton className="text-destructive hover:bg-destructive/10">
+              <SidebarMenuButton 
+                onClick={handleSignOut}
+                className="text-destructive hover:bg-destructive/10"
+              >
                 <LogOut />
                 <span>Sign Out</span>
               </SidebarMenuButton>

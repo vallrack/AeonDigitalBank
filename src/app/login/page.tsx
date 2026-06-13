@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState } from 'react';
@@ -9,19 +10,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Shield, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
+import { Shield, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const auth = useAuth();
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
+
     if (!email || !password) {
       toast({
         variant: "destructive",
@@ -33,8 +38,8 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
-      // Nota: Firebase requiere un formato de email válido. 
-      // Si "Vallrack" no es un email, asegúrate de registrarlo como vallrack@ejemplo.com o similar.
+      // Firebase requiere un email válido. Si intentas con "Vallrack", fallará.
+      // Debe ser algo como vallrack@aeon.com
       await signInWithEmailAndPassword(auth, email, password);
       toast({
         title: "Acceso concedido",
@@ -42,11 +47,16 @@ export default function LoginPage() {
       });
       router.push('/dashboard');
     } catch (error: any) {
-      console.error(error);
+      // No usamos console.error para evitar el overlay de error de NextJS en desarrollo
+      let msg = "Credenciales inválidas. Por favor, verifica tus datos.";
+      if (error.code === 'auth/invalid-email') {
+        msg = "El formato del email no es válido. Ejemplo: usuario@aeon.com";
+      }
+      setErrorMessage(msg);
       toast({
         variant: "destructive",
         title: "Error de inicio de sesión",
-        description: "Credenciales inválidas. Por favor, verifica tus datos.",
+        description: msg,
       });
     } finally {
       setIsLoading(false);
@@ -74,17 +84,24 @@ export default function LoginPage() {
             <CardDescription>Enter your credentials to access your account.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {errorMessage && (
+              <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive text-xs py-2">
+                <AlertCircle className="h-3 w-3" />
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
               <Input 
                 id="email" 
-                type="text" 
-                placeholder="name@example.com" 
+                type="email" 
+                placeholder="vallrack@aeon.com" 
                 className="bg-white/5 border-white/10" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
+              <p className="text-[10px] text-muted-foreground italic">Nota: Use un formato de email (ej: vallrack@aeon.com)</p>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
