@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   ArrowRightLeft, 
@@ -14,7 +14,8 @@ import {
   Eye,
   EyeOff,
   Search,
-  Users
+  Users,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -37,17 +38,13 @@ import { Input } from '@/components/ui/input';
 import { IncognitoProvider, useIncognito } from '@/components/incognito-context';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuth, useUser, useDoc } from '@/firebase';
+import { useAuth, useUser, useDoc, useFirestore } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { doc } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { doc, getDocs, collection, query, limit, setDoc, serverTimestamp } from 'firebase/firestore';
 
-function TopNav() {
+function TopNav({ userData }: { userData: any }) {
   const { isIncognito, toggleIncognito } = useIncognito();
   const { user } = useUser();
-  const db = useFirestore();
-  const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
-  const { data: userData } = useDoc(userRef);
   
   return (
     <header className="h-16 border-b flex items-center justify-between px-6 bg-background/50 backdrop-blur-md sticky top-0 z-40">
@@ -64,7 +61,8 @@ function TopNav() {
 
       <div className="flex items-center gap-2">
         {userData?.role === 'admin' && (
-          <div className="hidden md:flex items-center px-3 py-1 bg-accent/10 border border-accent/20 rounded-full text-[10px] font-bold text-accent uppercase tracking-tighter mr-2">
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-accent/20 border border-accent/30 rounded-full text-[10px] font-bold text-accent uppercase tracking-wider animate-pulse">
+            <ShieldAlert size={12} />
             Admin Mode
           </div>
         )}
@@ -89,15 +87,10 @@ function TopNav() {
   );
 }
 
-function DashboardSidebar() {
+function DashboardSidebar({ userData }: { userData: any }) {
   const pathname = usePathname();
-  const { user } = useUser();
   const auth = useAuth();
-  const db = useFirestore();
   const router = useRouter();
-
-  const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
-  const { data: userData } = useDoc(userRef);
 
   const handleSignOut = async () => {
     try {
@@ -160,7 +153,7 @@ function DashboardSidebar() {
 
         {isAdmin && (
           <SidebarGroup>
-            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-accent font-bold">Administration</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -168,7 +161,7 @@ function DashboardSidebar() {
                     asChild 
                     isActive={pathname === '/dashboard/admin'}
                     tooltip="User Management"
-                    className={pathname === '/dashboard/admin' ? "bg-accent/10 text-accent font-bold" : "text-accent/80"}
+                    className={pathname === '/dashboard/admin' ? "bg-accent/10 text-accent font-bold" : "text-accent/80 hover:bg-accent/5"}
                   >
                     <Link href="/dashboard/admin">
                       <Users />
@@ -222,12 +215,42 @@ function DashboardSidebar() {
 }
 
 export default function RootDashboardLayout({ children }: { children: React.ReactNode }) {
+  const { user, loading: userLoading } = useUser();
+  const db = useFirestore();
+  const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
+  const { data: userData, loading: docLoading } = useDoc(userRef);
+
+  // Lógica de inicialización de perfil
+  useEffect(() => {
+    if (!userLoading && user && !docLoading && !userData) {
+      const initializeProfile = async () => {
+        try {
+          const usersSnap = await getDocs(query(collection(db, "users"), limit(1)));
+          const isFirstUser = usersSnap.empty;
+          
+          await setDoc(doc(db, "users", user.uid), {
+            uid: user.uid,
+            email: user.email,
+            fullName: user.displayName || user.email?.split('@')[0] || 'New User',
+            balance: 5000,
+            role: isFirstUser ? 'admin' : 'user',
+            createdAt: serverTimestamp(),
+            kycStatus: 'Verified'
+          });
+        } catch (e) {
+          console.error("Error initializing profile:", e);
+        }
+      };
+      initializeProfile();
+    }
+  }, [user, userData, userLoading, docLoading, db]);
+
   return (
     <IncognitoProvider>
       <SidebarProvider defaultOpen={true}>
-        <DashboardSidebar />
+        <DashboardSidebar userData={userData} />
         <SidebarInset>
-          <TopNav />
+          <TopNav userData={userData} />
           <main className="p-6 md:p-8 max-w-7xl mx-auto w-full">
             {children}
           </main>
