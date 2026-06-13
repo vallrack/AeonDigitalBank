@@ -1,7 +1,7 @@
 
 "use client"
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   LayoutDashboard, 
   ArrowRightLeft, 
@@ -13,7 +13,8 @@ import {
   Bell,
   Eye,
   EyeOff,
-  Search
+  Search,
+  Users
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -25,7 +26,10 @@ import {
   SidebarMenuItem, 
   SidebarMenuButton,
   SidebarTrigger,
-  SidebarInset
+  SidebarInset,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -33,8 +37,10 @@ import { Input } from '@/components/ui/input';
 import { IncognitoProvider, useIncognito } from '@/components/incognito-context';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useDoc } from '@/firebase';
 import { signOut } from 'firebase/auth';
+import { doc } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
 
 function TopNav() {
   const { isIncognito, toggleIncognito } = useIncognito();
@@ -75,10 +81,15 @@ function TopNav() {
   );
 }
 
-function DashboardContent({ children }: { children: React.ReactNode }) {
+function DashboardSidebar() {
   const pathname = usePathname();
+  const { user } = useUser();
   const auth = useAuth();
+  const db = useFirestore();
   const router = useRouter();
+
+  const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
+  const { data: userData } = useDoc(userRef);
 
   const handleSignOut = async () => {
     try {
@@ -94,70 +105,125 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     { icon: ArrowRightLeft, label: 'Transfers', href: '/dashboard/transfers' },
     { icon: CreditCard, label: 'Virtual Cards', href: '/dashboard/cards' },
     { icon: History, label: 'Activity', href: '/dashboard/activity' },
+  ];
+
+  const secondaryItems = [
     { icon: ShieldCheck, label: 'Security', href: '/dashboard/security' },
     { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
   ];
 
+  const isAdmin = userData?.role === 'admin';
+
   return (
-    <SidebarProvider>
-      <Sidebar collapsible="icon" className="border-r border-border/50">
-        <SidebarHeader className="h-16 flex items-center px-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
-              <span className="text-primary-foreground font-headline font-bold">A</span>
-            </div>
-            <span className="font-headline font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">
-              AEON <span className="text-accent">BANK</span>
-            </span>
+    <Sidebar collapsible="icon" className="border-r border-border/50">
+      <SidebarHeader className="h-16 flex items-center px-4">
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
+            <span className="text-primary-foreground font-headline font-bold">A</span>
           </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu className="px-2 mt-4">
-            {menuItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton 
-                  asChild 
-                  isActive={pathname === item.href}
-                  tooltip={item.label}
-                  className={pathname === item.href ? "bg-primary/10 text-primary" : ""}
-                >
-                  <Link href={item.href}>
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarContent>
-        <SidebarFooter className="p-4">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton 
-                onClick={handleSignOut}
-                className="text-destructive hover:bg-destructive/10"
-              >
-                <LogOut />
-                <span>Sign Out</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset>
-        <TopNav />
-        <main className="p-6 md:p-8 max-w-7xl mx-auto w-full">
-          {children}
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+          <span className="font-headline font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">
+            AEON <span className="text-accent">BANK</span>
+          </span>
+        </Link>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Banking</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === item.href}
+                    tooltip={item.label}
+                    className={pathname === item.href ? "bg-primary/10 text-primary" : ""}
+                  >
+                    <Link href={item.href}>
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === '/dashboard/admin'}
+                    tooltip="User Management"
+                    className={pathname === '/dashboard/admin' ? "bg-accent/10 text-accent font-bold" : "text-accent/80"}
+                  >
+                    <Link href="/dashboard/admin">
+                      <Users />
+                      <span>Manage Clients</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Support</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {secondaryItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={pathname === item.href}
+                    tooltip={item.label}
+                  >
+                    <Link href={item.href}>
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter className="p-4">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton 
+              onClick={handleSignOut}
+              className="text-destructive hover:bg-destructive/10"
+            >
+              <LogOut />
+              <span>Sign Out</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
   );
 }
 
 export default function RootDashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <IncognitoProvider>
-      <DashboardContent>{children}</DashboardContent>
+      <SidebarProvider>
+        <DashboardSidebar />
+        <SidebarInset>
+          <TopNav />
+          <main className="p-6 md:p-8 max-w-7xl mx-auto w-full">
+            {children}
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
     </IncognitoProvider>
   );
 }
