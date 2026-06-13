@@ -10,9 +10,10 @@
         "email": { "type": "string", "format": "email" },
         "fullName": { "type": "string" },
         "balance": { "type": "number" },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "El rol del usuario en la plataforma." },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["uid", "email", "fullName", "balance"]
+      "required": ["uid", "email", "fullName", "balance", "role"]
     },
     "Transaction": {
       "title": "Transaction",
