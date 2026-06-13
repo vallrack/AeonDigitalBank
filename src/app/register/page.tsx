@@ -11,7 +11,7 @@ import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, 
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, collection, getDocs, query, limit, addDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { useAuth, useFirestore } from '@/firebase';
 import { cn } from '@/lib/utils';
 
@@ -113,20 +113,15 @@ export default function RegisterPage() {
   const startVerification = async () => {
     setIsVerifying(true);
     try {
-      // Se ha eliminado el flujo de smartKycOnboarding para permitir registro directo
-      // pero mantenemos la apariencia para el usuario final
-
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
       await updateProfile(user, { displayName: formData.fullName });
 
-      const usersRef = collection(db, "users");
-      const usersSnap = await getDocs(query(usersRef, limit(1)));
-      const isFirstUser = usersSnap.empty;
-      const assignedRole = (isFirstUser || formData.email === 'vallrack67@gmail.com') ? "admin" : "user";
+      // Determinamos el rol basándonos en el email del administrador principal
+      const assignedRole = formData.email === 'vallrack67@gmail.com' ? "admin" : "user";
 
-      // Guardamos la información incluyendo las referencias a las fotos cargadas
+      // Guardamos la información del perfil
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: formData.email,
@@ -137,6 +132,7 @@ export default function RegisterPage() {
         createdAt: serverTimestamp()
       });
 
+      // Creamos la transacción inicial de bienvenida
       await addDoc(collection(db, "users", user.uid, "transactions"), {
         userId: user.uid,
         merchant: "Aeon Bank Welcome Bonus",
@@ -147,6 +143,7 @@ export default function RegisterPage() {
         type: "income"
       });
 
+      // Generamos la tarjeta virtual inicial
       await addDoc(collection(db, "users", user.uid, "virtualCards"), {
         userId: user.uid,
         cardHolder: formData.fullName.toUpperCase(),
@@ -158,16 +155,17 @@ export default function RegisterPage() {
       });
 
       toast({
-        title: assignedRole === "admin" ? "Súper Admin Configurado" : "Cuenta Creada",
-        description: "Bienvenido al futuro de la banca digital.",
+        title: assignedRole === "admin" ? "Súper Admin Activado" : "Cuenta Activada",
+        description: "Bienvenido al futuro de la banca digital Aeon.",
       });
 
       setStep(4);
     } catch (error: any) {
+      console.error("Registration finalization error:", error);
       toast({
         variant: "destructive",
         title: "Error de Registro",
-        description: error.message || "No se pudo completar el registro.",
+        description: error.message || "No se pudo completar la activación de la cuenta.",
       });
     } finally {
       setIsVerifying(false);

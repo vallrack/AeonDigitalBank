@@ -25,7 +25,6 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.auth.uid == userId;
       
       // Permitir actualización de saldo propio o de otro usuario durante una transferencia
-      // (En una app real esto se haría vía Cloud Functions por seguridad)
       allow update: if isSignedIn() && (
         request.auth.uid == userId || 
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance'])) ||
@@ -42,7 +41,10 @@ service cloud.firestore {
       }
       
       match /virtualCards/{cardId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        // Permitir al usuario crear sus propias tarjetas al registrarse
+        allow create: if isSignedIn() && request.auth.uid == userId;
+        // Solo el dueño o admin puede leer/actualizar
+        allow read, update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
   }
