@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2 } from 'lucide-react';
+import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2, Search, User } from 'lucide-react';
 import { useUser, useFirestore, useDoc } from '@/firebase';
-import { doc, collection, addDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, addDoc, updateDoc, increment, getDocs, query, where, limit } from 'firebase/firestore';
 import { predictiveFraudMonitoring } from '@/ai/flows/predictive-fraud-monitoring';
 import { toast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -22,12 +22,51 @@ export default function TransfersPage() {
   const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
   const { data: userData } = useDoc(userRef);
 
-  const [recipient, setRecipient] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [recipientUser, setRecipientUser] = useState<any>(null);
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [fraudResult, setFraudResult] = useState<any>(null);
-  const [step, setStep] = useState(1); // 1: Form, 2: Fraud Check, 3: Success
+  const [step, setStep] = useState(1); // 1: Search, 2: Amount/Ref, 3: Fraud Check, 4: Success
+
+  const findRecipient = async () => {
+    if (!recipientEmail) return;
+    setIsProcessing(true);
+    try {
+      const q = query(
+        collection(db, 'users'), 
+        where('email', '==', recipientEmail.toLowerCase().trim()), 
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        toast({
+          variant: "destructive",
+          title: "Recipient not found",
+          description: "Make sure the email belongs to an active AEON account."
+        });
+        setRecipientUser(null);
+      } else {
+        const docData = querySnapshot.docs[0].data();
+        if (docData.uid === user?.uid) {
+          toast({
+            variant: "destructive",
+            title: "Invalid Recipient",
+            description: "You cannot transfer funds to yourself."
+          });
+          return;
+        }
+        setRecipientUser(docData);
+        setStep(2);
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Search Error", description: "Could not verify user." });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleTransferInit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +82,6 @@ export default function TransfersPage() {
 
     setIsProcessing(true);
     try {
-      // Call Genkit Fraud Monitoring AI
       const analysis = await predictiveFraudMonitoring({
         currentTransaction: {
           transactionId: Math.random().toString(36).substring(7),
@@ -51,54 +89,68 @@ export default function TransfersPage() {
           amount: parseFloat(amount),
           currency: 'USD',
           timestamp: new Date().toISOString(),
-          merchant: recipient,
-          location: 'Global (Online)'
+          merchant: recipientUser.fullName,
+          location: 'AEON Internal Network'
         },
         userContext: {
-          transactionHistory: [], // In a real app, we'd fetch recent history here
-          knownLocations: ['Home', 'Office'],
+          transactionHistory: [], 
+          knownLocations: ['AEON Digital'],
           averageTransactionAmount: 200,
           dailySpendLimit: 5000
         }
       });
 
       setFraudResult(analysis);
-      setStep(2);
+      setStep(3);
     } catch (error) {
-      console.error("Fraud monitoring failed", error);
-      // Proceed anyway if AI fails, or handle error
-      setStep(2);
+      setStep(3); // Proceed even if AI fails for MVP
     } finally {
       setIsProcessing(false);
     }
   };
 
   const confirmTransfer = async () => {
-    if (!user || !userData) return;
+    if (!user || !userData || !recipientUser) return;
     setIsProcessing(true);
 
     try {
       const numAmount = parseFloat(amount);
-      const transactionData = {
+      
+      // 1. Record for Sender (Expense)
+      await addDoc(collection(db, 'users', user.uid, 'transactions'), {
         userId: user.uid,
-        merchant: recipient,
+        merchant: `Transfer to ${recipientUser.fullName}`,
         amount: numAmount,
         category: 'Transfer',
         status: 'Completed',
         date: new Date().toISOString(),
         type: 'expense',
         reference: reference
-      };
+      });
 
-      // 1. Create transaction record
-      await addDoc(collection(db, 'users', user.uid, 'transactions'), transactionData);
+      // 2. Record for Recipient (Income)
+      await addDoc(collection(db, 'users', recipientUser.uid, 'transactions'), {
+        userId: recipientUser.uid,
+        merchant: `Transfer from ${userData.fullName}`,
+        amount: numAmount,
+        category: 'Transfer',
+        status: 'Completed',
+        date: new Date().toISOString(),
+        type: 'income',
+        reference: reference
+      });
 
-      // 2. Update user balance (Atomically)
+      // 3. Update Sender Balance
       await updateDoc(doc(db, 'users', user.uid), {
         balance: increment(-numAmount)
       });
 
-      setStep(3);
+      // 4. Update Recipient Balance
+      await updateDoc(doc(db, 'users', recipientUser.uid), {
+        balance: increment(numAmount)
+      });
+
+      setStep(4);
       toast({ title: "Transfer Successful" });
     } catch (error: any) {
       const permissionError = new FirestorePermissionError({
@@ -116,30 +168,54 @@ export default function TransfersPage() {
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-headline font-bold">Funds Transfer</h1>
-        <p className="text-muted-foreground">Move money with AI-enhanced security monitoring.</p>
+        <p className="text-muted-foreground">Internal AEON-to-AEON precision transfers.</p>
       </div>
 
       {step === 1 && (
         <Card className="glass border-primary/10">
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
-              <ArrowRightLeft className="text-primary" size={20} />
-              New Transfer
+              <Search className="text-primary" size={20} />
+              Find Recipient
             </CardTitle>
-            <CardDescription>Recipient and amount details.</CardDescription>
+            <CardDescription>Enter the recipient's registered email address.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Recipient Email</Label>
+              <Input 
+                id="email" 
+                type="email"
+                placeholder="e.g. name@aeonbank.com" 
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && findRecipient()}
+              />
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button className="w-full glow-indigo" onClick={findRecipient} disabled={isProcessing || !recipientEmail}>
+              {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Verify Recipient"}
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
+
+      {step === 2 && (
+        <Card className="glass border-primary/10 animate-in slide-in-from-right-4">
+          <CardHeader>
+            <div className="flex items-center gap-4 mb-2">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="text-primary" size={24} />
+              </div>
+              <div>
+                <CardTitle className="text-lg">{recipientUser?.fullName}</CardTitle>
+                <CardDescription>{recipientUser?.email}</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <form onSubmit={handleTransferInit}>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="recipient">Recipient Name or Email</Label>
-                <Input 
-                  id="recipient" 
-                  placeholder="e.g. Elena Smith" 
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  required
-                />
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="amount">Amount (USD)</Label>
                 <div className="relative">
@@ -166,16 +242,17 @@ export default function TransfersPage() {
                 />
               </div>
             </CardContent>
-            <CardFooter>
-              <Button type="submit" className="w-full glow-indigo" disabled={isProcessing}>
-                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Verify & Continue"}
+            <CardFooter className="flex gap-4">
+              <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
+              <Button type="submit" className="flex-1 glow-indigo" disabled={isProcessing}>
+                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Continue"}
               </Button>
             </CardFooter>
           </form>
         </Card>
       )}
 
-      {step === 2 && (
+      {step === 3 && (
         <div className="space-y-6 animate-in zoom-in-95 duration-500">
           <Card className={cn(
             "border-2",
@@ -197,11 +274,11 @@ export default function TransfersPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm">{fraudResult?.reason || "No suspicious activity detected. Transaction is safe to proceed."}</p>
+              <p className="text-sm">{fraudResult?.reason || "Internal transfer within secure AEON ecosystem. No suspicious activity detected."}</p>
               <div className="bg-background/50 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Transfer to:</span>
-                  <span className="font-bold">{recipient}</span>
+                  <span className="font-bold">{recipientUser?.fullName}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Amount:</span>
@@ -210,20 +287,20 @@ export default function TransfersPage() {
               </div>
             </CardContent>
             <CardFooter className="flex gap-4">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Cancel</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>Cancel</Button>
               <Button 
                 className={cn("flex-1", fraudResult?.isSuspicious ? "bg-amber-500 hover:bg-amber-600" : "glow-indigo")} 
                 onClick={confirmTransfer}
                 disabled={isProcessing}
               >
-                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Confirm Transfer"}
+                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Confirm & Send Funds"}
               </Button>
             </CardFooter>
           </Card>
         </div>
       )}
 
-      {step === 3 && (
+      {step === 4 && (
         <Card className="text-center p-12 animate-in zoom-in-95 duration-700">
           <CardContent className="space-y-6">
             <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto">
@@ -231,12 +308,13 @@ export default function TransfersPage() {
             </div>
             <div className="space-y-2">
               <h2 className="text-2xl font-headline font-bold">Transfer Complete</h2>
-              <p className="text-muted-foreground">Successfully sent ${parseFloat(amount).toFixed(2)} to {recipient}.</p>
+              <p className="text-muted-foreground">Successfully sent ${parseFloat(amount).toFixed(2)} to {recipientUser?.fullName}.</p>
             </div>
             <Button className="w-full glow-indigo" onClick={() => {
               setStep(1);
               setAmount('');
-              setRecipient('');
+              setRecipientEmail('');
+              setRecipientUser(null);
               setReference('');
             }}>
               New Transfer
