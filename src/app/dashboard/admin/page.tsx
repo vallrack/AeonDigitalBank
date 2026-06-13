@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, doc, addDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,10 @@ import {
   MoreVertical,
   Mail,
   Calendar,
-  DollarSign
+  DollarSign,
+  Edit,
+  Trash2,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -30,17 +33,29 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from '@/components/ui/dialog';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from '@/hooks/use-toast';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function AdminUsersPage() {
   const { user: currentUser } = useUser();
   const db = useFirestore();
   const [searchTerm, setSearchTerm] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   // Form state for new user
   const [newUserData, setNewUserData] = useState({
@@ -63,11 +78,9 @@ export default function AdminUsersPage() {
 
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsCreating(true);
+    setIsProcessing(true);
 
     try {
-      // Para crear otro usuario sin cerrar la sesión actual del admin en Firebase Client SDK,
-      // inicializamos una app secundaria temporal.
       const secondaryApp = getApps().find(app => app.name === 'AdminTool') || initializeApp(firebaseConfig, 'AdminTool');
       const secondaryAuth = getAuth(secondaryApp);
 
@@ -79,7 +92,6 @@ export default function AdminUsersPage() {
       
       const newUserId = userCredential.user.uid;
 
-      // 1. Crear perfil en Firestore
       await setDoc(doc(db, "users", newUserId), {
         uid: newUserId,
         email: newUserData.email,
@@ -90,7 +102,6 @@ export default function AdminUsersPage() {
         createdAt: serverTimestamp()
       });
 
-      // 2. Transacción inicial
       await addDoc(collection(db, "users", newUserId, "transactions"), {
         userId: newUserId,
         merchant: "Admin Manual Deposit",
@@ -101,23 +112,12 @@ export default function AdminUsersPage() {
         type: "income"
       });
 
-      // 3. Tarjeta virtual inicial
-      await addDoc(collection(db, "users", newUserId, "virtualCards"), {
-        userId: newUserId,
-        cardHolder: newUserData.fullName.toUpperCase(),
-        cardNumber: "4255" + Math.floor(100000000000 + Math.random() * 900000000000).toString(),
-        expiryDate: "12/28",
-        cvv: Math.floor(100 + Math.random() * 899).toString(),
-        isFrozen: false,
-        type: "standard"
-      });
-
       toast({
         title: "Client Created Successfully",
         description: `User ${newUserData.fullName} has been added to Aeon Bank.`,
       });
 
-      setOpen(false);
+      setRegisterOpen(false);
       setNewUserData({ fullName: '', email: '', password: '', balance: 5000 });
     } catch (error: any) {
       toast({
@@ -126,8 +126,58 @@ export default function AdminUsersPage() {
         description: error.message || "Could not create the client profile.",
       });
     } finally {
-      setIsCreating(false);
+      setIsProcessing(false);
     }
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    setIsProcessing(true);
+
+    const userRef = doc(db, 'users', selectedUser.uid);
+    const updateData = {
+      fullName: selectedUser.fullName,
+      balance: Number(selectedUser.balance),
+      role: selectedUser.role
+    };
+
+    updateDoc(userRef, updateData)
+      .then(() => {
+        toast({ title: "User updated successfully" });
+        setEditOpen(false);
+      })
+      .catch(async () => {
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: updateData
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => setIsProcessing(false));
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
+    
+    const userRef = doc(db, 'users', userId);
+    deleteDoc(userRef)
+      .then(() => {
+        toast({ title: "User deleted" });
+      })
+      .catch(async () => {
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'delete'
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
+  };
+
+  const openEditDialog = (user: any) => {
+    setSelectedUser({ ...user });
+    setEditOpen(true);
   };
 
   return (
@@ -141,7 +191,7 @@ export default function AdminUsersPage() {
           <p className="text-muted-foreground">Admin panel for supervising and registering users.</p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={registerOpen} onOpenChange={setRegisterOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2 glow-indigo">
               <UserPlus size={16} />
@@ -152,7 +202,7 @@ export default function AdminUsersPage() {
             <DialogHeader>
               <DialogTitle className="font-headline text-xl">Register New Client</DialogTitle>
               <DialogDescription>
-                Fill in the details to create a new bank account. This user will receive an initial balance and a virtual card.
+                Create a new account with an initial balance.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateClient}>
@@ -205,14 +255,65 @@ export default function AdminUsersPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit" className="w-full glow-indigo" disabled={isCreating}>
-                  {isCreating ? <Loader2 className="animate-spin mr-2" /> : "Create & Activate Account"}
+                <Button type="submit" className="w-full glow-indigo" disabled={isProcessing}>
+                  {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Create & Activate Account"}
                 </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Edit User Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="glass border-white/10 sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="font-headline text-xl">Edit Client Profile</DialogTitle>
+            <DialogDescription>
+              Modify user details, balance or role.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <form onSubmit={handleUpdateUser}>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input 
+                    value={selectedUser.fullName}
+                    onChange={(e) => setSelectedUser({...selectedUser, fullName: e.target.value})}
+                    className="bg-white/5 border-white/10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Current Balance ($)</Label>
+                  <Input 
+                    type="number"
+                    value={selectedUser.balance}
+                    onChange={(e) => setSelectedUser({...selectedUser, balance: e.target.value})}
+                    className="bg-white/5 border-white/10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm ring-offset-background"
+                    value={selectedUser.role}
+                    onChange={(e) => setSelectedUser({...selectedUser, role: e.target.value})}
+                  >
+                    <option value="user" className="bg-[#0E1016]">Standard User</option>
+                    <option value="admin" className="bg-[#0E1016]">Administrator</option>
+                  </select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit" className="w-full glow-indigo" disabled={isProcessing}>
+                  {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="glass border-primary/5">
@@ -303,9 +404,23 @@ export default function AdminUsersPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                        <MoreVertical size={16} />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                            <MoreVertical size={16} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="glass border-white/10">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator className="bg-white/5" />
+                          <DropdownMenuItem onClick={() => openEditDialog(u)} className="gap-2">
+                            <Edit size={14} /> Edit Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteUser(u.uid)} className="gap-2 text-rose-400 focus:text-rose-400">
+                            <Trash2 size={14} /> Delete User
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
