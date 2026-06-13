@@ -8,9 +8,15 @@ import { TrendingUp, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface BalanceWidgetProps {
   balance?: number;
+  income?: number;
+  expenses?: number;
 }
 
-export function BalanceWidget({ balance = 0 }: BalanceWidgetProps) {
+export function BalanceWidget({ 
+  balance = 0, 
+  income = 0, 
+  expenses = 0 
+}: BalanceWidgetProps) {
   return (
     <Card className="glass overflow-hidden relative border-primary/10">
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl" />
@@ -29,9 +35,9 @@ export function BalanceWidget({ balance = 0 }: BalanceWidgetProps) {
           <div className="flex items-center gap-2 text-xs">
             <span className="text-emerald-400 flex items-center gap-0.5 font-medium">
               <TrendingUp size={12} />
-              +0.0%
+              Live
             </span>
-            <span className="text-muted-foreground">vs last month</span>
+            <span className="text-muted-foreground">Account Status: Active</span>
           </div>
         </div>
 
@@ -39,19 +45,19 @@ export function BalanceWidget({ balance = 0 }: BalanceWidgetProps) {
           <div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-widest flex items-center gap-1 mb-1">
               <ArrowDownRight size={10} className="text-emerald-400" />
-              Income
+              Total Income
             </div>
             <div className="text-lg font-headline font-semibold">
-              <PrivacyMask>${balance.toLocaleString()}</PrivacyMask>
+              <PrivacyMask>${income.toLocaleString()}</PrivacyMask>
             </div>
           </div>
           <div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-widest flex items-center gap-1 mb-1">
               <ArrowUpRight size={10} className="text-rose-400" />
-              Expenses
+              Total Expenses
             </div>
             <div className="text-lg font-headline font-semibold">
-              <PrivacyMask>$0</PrivacyMask>
+              <PrivacyMask>${expenses.toLocaleString()}</PrivacyMask>
             </div>
           </div>
         </div>

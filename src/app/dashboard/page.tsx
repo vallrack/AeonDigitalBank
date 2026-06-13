@@ -27,19 +27,59 @@ export default function DashboardPage() {
   const { user, loading: userLoading } = useUser();
   const db = useFirestore();
 
-  // Memoizar referencias para evitar loops de renderizado
   const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
-  const transactionsQuery = useMemo(() => {
+  
+  // Obtenemos todas las transacciones para los cálculos del dashboard
+  const allTransactionsQuery = useMemo(() => {
     if (!user) return null;
     return query(
       collection(db, 'users', user.uid, 'transactions'),
-      orderBy('date', 'desc'),
-      limit(5)
+      orderBy('date', 'desc')
     );
   }, [db, user]);
 
   const { data: userData, loading: profileLoading } = useDoc(userRef);
-  const { data: transactions, loading: txLoading } = useCollection(transactionsQuery);
+  const { data: allTransactions, loading: txLoading } = useCollection(allTransactionsQuery);
+
+  // Transacciones recientes para la tabla (las últimas 5)
+  const recentTransactions = allTransactions.slice(0, 5);
+
+  // Cálculo de totales reales
+  const totals = useMemo(() => {
+    return allTransactions.reduce((acc, tx) => {
+      const amount = Math.abs(tx.amount || 0);
+      if (tx.type === 'income') acc.income += amount;
+      else if (tx.type === 'expense') acc.expenses += amount;
+      return acc;
+    }, { income: 0, expenses: 0 });
+  }, [allTransactions]);
+
+  // Procesamiento de datos para el gráfico (últimos 7 días o genérico si no hay suficientes)
+  const activityData = useMemo(() => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const currentDay = new Date().getDay();
+    
+    // Inicializamos los últimos 7 días con 0
+    const dataMap: Record<string, { day: string, income: number, expense: number, order: number }> = {};
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayLabel = days[d.getDay()];
+      dataMap[dayLabel] = { day: dayLabel, income: 0, expense: 0, order: 6 - i };
+    }
+
+    // Llenamos con datos reales si existen
+    allTransactions.forEach(tx => {
+      const txDate = new Date(tx.date);
+      const dayLabel = days[txDate.getDay()];
+      if (dataMap[dayLabel]) {
+        if (tx.type === 'income') dataMap[dayLabel].income += tx.amount;
+        else dataMap[dayLabel].expense += tx.amount;
+      }
+    });
+
+    return Object.values(dataMap).sort((a, b) => a.order - b.order);
+  }, [allTransactions]);
 
   if (userLoading || profileLoading) {
     return (
@@ -48,16 +88,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  const activityData = [
-    { day: 'Mon', income: 400, expense: 240 },
-    { day: 'Tue', income: 300, expense: 139 },
-    { day: 'Wed', income: 200, expense: 980 },
-    { day: 'Thu', income: 278, expense: 390 },
-    { day: 'Fri', income: 189, expense: 480 },
-    { day: 'Sat', income: 239, expense: 380 },
-    { day: 'Sun', income: 349, expense: 430 },
-  ];
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -81,11 +111,18 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <BalanceWidget balance={userData?.balance || 0} />
+        <BalanceWidget 
+          balance={userData?.balance || 0} 
+          income={totals.income}
+          expenses={totals.expenses}
+        />
         
         <Card className="md:col-span-2 glass border-primary/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-headline font-medium">Financial Activity</CardTitle>
+            <div>
+              <CardTitle className="text-base font-headline font-medium">Weekly Financial Activity</CardTitle>
+              <CardDescription className="text-xs">Income and expenses over the last 7 days.</CardDescription>
+            </div>
           </CardHeader>
           <CardContent className="h-[200px] w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
@@ -101,8 +138,8 @@ export default function DashboardPage() {
                   cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                   contentStyle={{ backgroundColor: '#0E1016', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
                 />
-                <Bar dataKey="income" fill="#4062FF" radius={[4, 4, 0, 0]} barSize={12} />
-                <Bar dataKey="expense" fill="#73CFFF" radius={[4, 4, 0, 0]} barSize={12} />
+                <Bar dataKey="income" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} barSize={12} />
+                <Bar dataKey="expense" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} barSize={12} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -122,26 +159,26 @@ export default function DashboardPage() {
           <CardContent>
             {txLoading ? (
               <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
-            ) : transactions.length === 0 ? (
+            ) : recentTransactions.length === 0 ? (
               <div className="text-center p-8 text-muted-foreground">No transactions found.</div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow className="border-border/50 hover:bg-transparent">
-                    <TableHead className="text-xs uppercase tracking-wider font-semibold">Merchant</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wider font-semibold">Merchant / Recipient</TableHead>
                     <TableHead className="text-xs uppercase tracking-wider font-semibold">Category</TableHead>
                     <TableHead className="text-xs uppercase tracking-wider font-semibold text-right">Amount</TableHead>
                     <TableHead className="text-xs uppercase tracking-wider font-semibold">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transactions.map((tx: any) => (
+                  {recentTransactions.map((tx: any) => (
                     <TableRow key={tx.id} className="border-border/30 hover:bg-muted/30">
                       <TableCell className="font-medium">
                         <div className="flex flex-col">
                           <span>{tx.merchant}</span>
                           <span className="text-[10px] text-muted-foreground">
-                            {tx.date?.toDate ? tx.date.toDate().toLocaleDateString() : tx.date}
+                            {tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}
                           </span>
                         </div>
                       </TableCell>
