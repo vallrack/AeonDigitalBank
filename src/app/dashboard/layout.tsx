@@ -226,37 +226,38 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
   useEffect(() => {
     if (!userLoading && user && !docLoading && !userData) {
       const initializeProfile = async () => {
+        let isFirstUser = false;
         try {
+          // Intentamos ver si hay otros usuarios para asignar rol de admin
           const usersSnap = await getDocs(query(collection(db, "users"), limit(1)));
-          const isFirstUser = usersSnap.empty;
-          
-          const profileData = {
-            uid: user.uid,
-            email: user.email,
-            fullName: user.displayName || user.email?.split('@')[0] || 'New User',
-            balance: 5000,
-            role: isFirstUser ? 'admin' : 'user',
-            createdAt: serverTimestamp(),
-            kycStatus: 'Verified'
-          };
-
-          setDoc(doc(db, "users", user.uid), profileData)
-            .catch(async (error) => {
-              const permissionError = new FirestorePermissionError({
-                path: `users/${user.uid}`,
-                operation: 'create',
-                requestResourceData: profileData
-              });
-              errorEmitter.emit('permission-error', permissionError);
-            });
+          isFirstUser = usersSnap.empty;
         } catch (e) {
-          // Si el getDocs falla, probablemente es un error de permisos
-          const permissionError = new FirestorePermissionError({
-            path: 'users',
-            operation: 'list'
-          });
-          errorEmitter.emit('permission-error', permissionError);
+          // Si falla por permisos, asumimos que no es el primero, 
+          // a menos que sea el email del administrador principal
         }
+
+        // Forzar admin para el email específico del usuario
+        const finalRole = (isFirstUser || user.email === 'vallrack67@gmail.com') ? 'admin' : 'user';
+        
+        const profileData = {
+          uid: user.uid,
+          email: user.email,
+          fullName: user.displayName || user.email?.split('@')[0] || 'New User',
+          balance: 5000,
+          role: finalRole,
+          createdAt: serverTimestamp(),
+          kycStatus: 'Verified'
+        };
+
+        setDoc(doc(db, "users", user.uid), profileData)
+          .catch(async (error) => {
+            const permissionError = new FirestorePermissionError({
+              path: `users/${user.uid}`,
+              operation: 'create',
+              requestResourceData: profileData
+            });
+            errorEmitter.emit('permission-error', permissionError);
+          });
       };
       initializeProfile();
     }

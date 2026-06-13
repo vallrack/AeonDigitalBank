@@ -9,7 +9,7 @@ import { toast } from '@/hooks/use-toast';
 export function FirebaseErrorListener() {
   useEffect(() => {
     const handlePermissionError = (error: FirestorePermissionError) => {
-      console.error('Firebase Permission Error:', error.context);
+      // No usamos console.error para evitar que Next.js bloquee la UI con el overlay de error
       toast({
         variant: 'destructive',
         title: 'Error de Permisos',
