@@ -1,13 +1,13 @@
 
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, Loader2, Camera, FileText } from 'lucide-react';
 import { smartKycOnboarding } from '@/ai/flows/smart-kyc-onboarding-flow';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -22,6 +22,10 @@ export default function RegisterPage() {
   const db = useFirestore();
   const [step, setStep] = useState(1);
   const [isVerifying, setIsVerifying] = useState(false);
+  
+  const [idPhoto, setIdPhoto] = useState<string | null>(null);
+  const [facePhoto, setFacePhoto] = useState<string | null>(null);
+  
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -32,60 +36,80 @@ export default function RegisterPage() {
     idNumber: ''
   });
 
-  const handleNext = () => setStep(step + 1);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setter(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleNext = () => {
+    if (step === 1 && (!formData.email || !formData.password || !formData.fullName)) {
+      toast({ variant: "destructive", title: "Faltan datos", description: "Nombre, email y clave son obligatorios." });
+      return;
+    }
+    if (step === 2 && (!idPhoto || !facePhoto)) {
+      toast({ variant: "destructive", title: "Documentos requeridos", description: "Debes subir tu ID y una selfie para continuar." });
+      return;
+    }
+    setStep(step + 1);
+  };
+  
   const handlePrev = () => setStep(step - 1);
 
   const startVerification = async () => {
-    if (!formData.email || !formData.password || !formData.fullName) {
-      toast({
-        variant: "destructive",
-        title: "Required Fields",
-        description: "Name, email and password are required.",
-      });
-      return;
-    }
-
     setIsVerifying(true);
     try {
-      const mockImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-
-      await smartKycOnboarding({
-        documentPhotoDataUri: mockImage,
-        faceScanDataUri: mockImage,
+      // 1. Ejecutar el flujo de IA con las imágenes reales en Base64
+      const kycResult = await smartKycOnboarding({
+        documentPhotoDataUri: idPhoto!,
+        faceScanDataUri: facePhoto!,
         personalInformation: {
           fullName: formData.fullName,
           dateOfBirth: formData.dob || "1990-01-01",
-          address: formData.address || "Main St 123",
+          address: formData.address || "No especificada",
           documentType: formData.idType,
-          documentNumber: formData.idNumber || "ABC12345",
+          documentNumber: formData.idNumber || "PENDIENTE",
           nationality: 'Global'
         }
       });
 
+      if (!kycResult.isVerified) {
+        throw new Error(`Verificación fallida: ${kycResult.verificationDetails}`);
+      }
+
+      // 2. Crear usuario en Auth
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
       await updateProfile(user, { displayName: formData.fullName });
 
+      // 3. Determinar rol (el primero es admin)
       const usersRef = collection(db, "users");
       const usersSnap = await getDocs(query(usersRef, limit(1)));
       const isFirstUser = usersSnap.empty;
       const assignedRole = isFirstUser ? "admin" : "user";
 
-      // Crear perfil en Firestore
+      // 4. Guardar perfil en Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: formData.email,
         fullName: formData.fullName,
         balance: 5000.00,
         role: assignedRole,
+        kycStatus: 'Verified',
+        kycConfidence: kycResult.confidenceScore,
         createdAt: serverTimestamp()
       });
 
-      // Crear transacción de bienvenida
+      // 5. Transacción de bienvenida
       await addDoc(collection(db, "users", user.uid, "transactions"), {
         userId: user.uid,
-        merchant: "Aeon Bank Welcome",
+        merchant: "Aeon Bank Welcome Bonus",
         amount: 5000.00,
         category: "Income",
         status: "Completed",
@@ -93,7 +117,7 @@ export default function RegisterPage() {
         type: "income"
       });
 
-      // Crear primera tarjeta virtual
+      // 6. Primera tarjeta virtual
       await addDoc(collection(db, "users", user.uid, "virtualCards"), {
         userId: user.uid,
         cardHolder: formData.fullName.toUpperCase(),
@@ -105,16 +129,16 @@ export default function RegisterPage() {
       });
 
       toast({
-        title: assignedRole === "admin" ? "Super Admin Configured" : "Account Created",
-        description: "Welcome to the future of banking.",
+        title: assignedRole === "admin" ? "Súper Admin Configurado" : "Cuenta Creada",
+        description: "Bienvenido al futuro de la banca digital.",
       });
 
       setStep(4);
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Registration Error",
-        description: error.message || "An error occurred during registration.",
+        title: "Error de Registro",
+        description: error.message || "No se pudo completar la verificación.",
       });
     } finally {
       setIsVerifying(false);
@@ -152,48 +176,46 @@ export default function RegisterPage() {
         {step === 1 && (
           <Card className="glass border-white/5 animate-in fade-in slide-in-from-right-4">
             <CardHeader>
-              <CardTitle className="text-2xl font-headline font-bold">Personal Details</CardTitle>
-              <CardDescription>Tell us a bit about yourself to start your application.</CardDescription>
+              <CardTitle className="text-2xl font-headline font-bold">Datos Personales</CardTitle>
+              <CardDescription>Comencemos con tu información básica.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Legal Full Name</Label>
+                <Label htmlFor="fullName">Nombre Completo</Label>
                 <Input 
                   id="fullName" 
-                  placeholder="John Doe" 
+                  placeholder="Ej. Juan Pérez" 
                   className="bg-white/5 border-white/10"
                   value={formData.fullName}
                   onChange={(e) => setFormData({...formData, fullName: e.target.value})}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="john@example.com" 
-                    className="bg-white/5 border-white/10"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input 
-                    id="password" 
-                    type="password" 
-                    placeholder="••••••••" 
-                    className="bg-white/5 border-white/10"
-                    value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Correo Electrónico</Label>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="tu@email.com" 
+                  className="bg-white/5 border-white/10"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña</Label>
+                <Input 
+                  id="password" 
+                  type="password" 
+                  placeholder="••••••••" 
+                  className="bg-white/5 border-white/10"
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                />
               </div>
             </CardContent>
             <CardFooter>
               <Button className="w-full glow-indigo group" onClick={handleNext}>
-                Continue <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
+                Siguiente <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
               </Button>
             </CardFooter>
           </Card>
@@ -202,19 +224,71 @@ export default function RegisterPage() {
         {step === 2 && (
           <Card className="glass border-white/5 animate-in fade-in slide-in-from-right-4">
             <CardHeader>
-              <CardTitle className="text-2xl font-headline font-bold">Identity Verification</CardTitle>
-              <CardDescription>We'll simulate the KYC upload for this demonstration.</CardDescription>
+              <CardTitle className="text-2xl font-headline font-bold">Verificación KYC</CardTitle>
+              <CardDescription>Sube tu documento y una selfie para el análisis de IA.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="border-2 border-dashed border-white/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center group cursor-default">
-                <Upload className="text-primary mb-4" size={24} />
-                <p className="font-headline font-medium">Document Simulation Ready</p>
-                <p className="text-xs text-muted-foreground">The AI will process a standard template.</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Documento de Identidad (ID/Pasaporte)</Label>
+                  <div className={cn(
+                    "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-colors relative overflow-hidden",
+                    idPhoto ? "border-primary bg-primary/5" : "border-white/10 hover:border-primary/50"
+                  )}>
+                    {idPhoto ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <CheckCircle className="text-primary" size={24} />
+                        <span className="text-xs text-primary font-medium">Documento Cargado</span>
+                        <Button variant="ghost" size="xs" onClick={() => setIdPhoto(null)} className="h-6 text-[10px]">Cambiar</Button>
+                      </div>
+                    ) : (
+                      <>
+                        <FileText className="text-muted-foreground mb-2" size={24} />
+                        <p className="text-xs text-muted-foreground mb-2">Sube una foto clara de tu ID</p>
+                        <Input 
+                          type="file" 
+                          accept="image/*" 
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={(e) => handleFileChange(e, setIdPhoto)}
+                        />
+                        <Button size="sm" variant="outline">Seleccionar Archivo</Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Selfie de Verificación</Label>
+                  <div className={cn(
+                    "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-colors relative overflow-hidden",
+                    facePhoto ? "border-primary bg-primary/5" : "border-white/10 hover:border-primary/50"
+                  )}>
+                    {facePhoto ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <CheckCircle className="text-primary" size={24} />
+                        <span className="text-xs text-primary font-medium">Selfie Cargada</span>
+                        <Button variant="ghost" size="xs" onClick={() => setFacePhoto(null)} className="h-6 text-[10px]">Cambiar</Button>
+                      </div>
+                    ) : (
+                      <>
+                        <Camera className="text-muted-foreground mb-2" size={24} />
+                        <p className="text-xs text-muted-foreground mb-2">Tu rostro debe ser visible</p>
+                        <Input 
+                          type="file" 
+                          accept="image/*" 
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={(e) => handleFileChange(e, setFacePhoto)}
+                        />
+                        <Button size="sm" variant="outline">Tomar Foto</Button>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             </CardContent>
             <CardFooter className="flex gap-4">
-              <Button variant="outline" onClick={handlePrev} className="w-1/3 border-white/10">Back</Button>
-              <Button className="w-2/3 glow-indigo" onClick={handleNext}>Process Verification</Button>
+              <Button variant="outline" onClick={handlePrev} className="w-1/3 border-white/10">Atrás</Button>
+              <Button className="w-2/3 glow-indigo" onClick={handleNext}>Continuar</Button>
             </CardFooter>
           </Card>
         )}
@@ -230,12 +304,12 @@ export default function RegisterPage() {
                   </div>
                 </div>
               </div>
-              <CardTitle className="text-2xl font-headline font-bold">AI Processing</CardTitle>
-              <CardDescription>Finalizing your biometric and data analysis.</CardDescription>
+              <CardTitle className="text-2xl font-headline font-bold">Procesando con IA</CardTitle>
+              <CardDescription>Nuestra IA está verificando tus documentos en tiempo real.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-               <div className="text-sm text-center text-muted-foreground">
-                 Clicking finalize will create your real account and assign a precision bank account and your first virtual card.
+               <div className="text-sm text-center text-muted-foreground bg-white/5 p-4 rounded-xl border border-white/5">
+                 Al hacer clic en finalizar, la IA comparará tu selfie con tu ID y validará tus datos para activar tu cuenta bancaria de alta precisión.
                </div>
             </CardContent>
             <CardFooter>
@@ -247,10 +321,10 @@ export default function RegisterPage() {
                 {isVerifying ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Assigning Account...
+                    Analizando Identidad...
                   </>
                 ) : (
-                  "Finalize & Access AEON"
+                  "Finalizar y Activar Cuenta"
                 )}
               </Button>
             </CardFooter>
@@ -263,15 +337,15 @@ export default function RegisterPage() {
               <div className="w-20 h-20 bg-emerald-400/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="text-emerald-400" size={40} />
               </div>
-              <CardTitle className="text-3xl font-headline font-bold">Success!</CardTitle>
-              <CardDescription className="text-lg">Your precision bank account is active.</CardDescription>
+              <CardTitle className="text-3xl font-headline font-bold">¡Bienvenido!</CardTitle>
+              <CardDescription className="text-lg">Tu cuenta Aeon está activa y verificada.</CardDescription>
             </CardHeader>
             <CardContent className="text-center p-8">
               <p className="text-muted-foreground mb-8">
-                Your account for <strong>{formData.email}</strong> is ready with a $5,000 credit.
+                Hemos asignado un saldo inicial de <strong>$5,000.00</strong> y generado tu primera tarjeta virtual.
               </p>
               <Button className="w-full h-14 text-lg glow-indigo font-headline" asChild>
-                <Link href="/login">Go to Login</Link>
+                <Link href="/login">Acceder a mi Dashboard</Link>
               </Button>
             </CardContent>
           </Card>
