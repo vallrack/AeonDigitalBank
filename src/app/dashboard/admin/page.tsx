@@ -3,7 +3,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, addDoc, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,9 @@ import {
   DollarSign,
   Edit,
   Trash2,
-  ShieldAlert
+  ShieldAlert,
+  PlusCircle,
+  ArrowUpCircle
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -56,7 +58,9 @@ export default function AdminUsersPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [depositAmount, setDepositAmount] = useState('');
 
   const [newUserData, setNewUserData] = useState({
     fullName: '',
@@ -133,6 +137,51 @@ export default function AdminUsersPage() {
         title: "Registration Error",
         description: error.message,
       });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser || !depositAmount || Number(depositAmount) <= 0) return;
+    setIsProcessing(true);
+
+    const amount = Number(depositAmount);
+    const userRef = doc(db, 'users', selectedUser.uid);
+    const txCollectionRef = collection(db, 'users', selectedUser.uid, 'transactions');
+
+    try {
+      // 1. Actualizar balance
+      await updateDoc(userRef, {
+        balance: increment(amount)
+      });
+
+      // 2. Registrar transacción
+      await addDoc(txCollectionRef, {
+        userId: selectedUser.uid,
+        merchant: "Admin Manual Deposit",
+        amount: amount,
+        category: "Income",
+        status: "Completed",
+        date: new Date().toISOString(),
+        type: "income",
+        reference: "Filtro de administrador"
+      });
+
+      toast({ 
+        title: "Deposit Successful", 
+        description: `Successfully added $${amount} to ${selectedUser.fullName}'s account.`
+      });
+      setDepositOpen(false);
+      setDepositAmount('');
+    } catch (error: any) {
+      const permissionError = new FirestorePermissionError({
+        path: userRef.path,
+        operation: 'update',
+        requestResourceData: { balance: amount }
+      });
+      errorEmitter.emit('permission-error', permissionError);
     } finally {
       setIsProcessing(false);
     }
@@ -273,6 +322,38 @@ export default function AdminUsersPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
+        <DialogContent className="glass border-white/10 sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Deposit Funds</DialogTitle>
+            <DialogDescription>Add balance to {selectedUser?.fullName}'s account.</DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <form onSubmit={handleDeposit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Amount (USD)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                  <Input 
+                    type="number" 
+                    className="pl-7" 
+                    placeholder="0.00"
+                    value={depositAmount} 
+                    onChange={e => setDepositAmount(e.target.value)} 
+                    required
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit" className="w-full glow-indigo" disabled={isProcessing}>
+                  {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Confirm Deposit"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="glass"><CardHeader><CardTitle>{users.length}</CardTitle><CardDescription>Total Clients</CardDescription></CardHeader></Card>
         <Card className="glass"><CardHeader><CardTitle>{users.filter(u => u.role === 'admin').length}</CardTitle><CardDescription>Admins</CardDescription></CardHeader></Card>
@@ -308,8 +389,16 @@ export default function AdminUsersPage() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical size={14} /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="glass">
-                        <DropdownMenuItem onClick={() => { setSelectedUser(u); setEditOpen(true); }}><Edit size={12} className="mr-2"/>Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteUser(u.uid)} className="text-destructive"><Trash2 size={12} className="mr-2"/>Delete</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setSelectedUser(u); setDepositOpen(true); }}>
+                          <ArrowUpCircle size={12} className="mr-2 text-emerald-400"/>Deposit Funds
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setSelectedUser(u); setEditOpen(true); }}>
+                          <Edit size={12} className="mr-2"/>Edit Profile
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-white/5" />
+                        <DropdownMenuItem onClick={() => handleDeleteUser(u.uid)} className="text-destructive">
+                          <Trash2 size={12} className="mr-2"/>Delete User
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
