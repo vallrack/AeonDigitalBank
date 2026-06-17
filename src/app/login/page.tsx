@@ -10,9 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Shield, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { Shield, Eye, EyeOff, ArrowRight, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -22,6 +23,7 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const auth = useAuth();
   const router = useRouter();
+  const { t } = useI18n();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +69,17 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0E1016] flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-[#0E1016] flex flex-col items-center justify-center p-6 relative">
+      {/* Botón de Regresar */}
+      <div className="absolute top-8 left-8">
+        <Button variant="ghost" asChild className="gap-2 text-muted-foreground hover:text-white transition-colors">
+          <Link href="/">
+            <ArrowLeft size={18} />
+            {t.common.back}
+          </Link>
+        </Button>
+      </div>
+
       <div className="mb-8 flex flex-col items-center gap-4">
         <Link href="/" className="flex items-center gap-2">
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center glow-indigo">
@@ -98,7 +110,7 @@ export default function LoginPage() {
               <Input 
                 id="email" 
                 type="email" 
-                placeholder="vallrack67@gmail.com" 
+                placeholder="email@example.com" 
                 className="bg-white/5 border-white/10" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -142,12 +154,12 @@ export default function LoginPage() {
                 </>
               ) : (
                 <>
-                  Sign In <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
+                  {t.common.sign_in} <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
                 </>
               )}
             </Button>
             <div className="text-center text-sm text-muted-foreground">
-              Don't have an account? <Link href="/register" className="text-primary hover:text-accent font-medium">Get Started / Register</Link>
+              Don't have an account? <Link href="/register" className="text-primary hover:text-accent font-medium">Get Started</Link>
             </div>
           </CardFooter>
         </form>

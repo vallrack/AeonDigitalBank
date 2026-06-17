@@ -15,11 +15,13 @@ import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/fires
 import { useAuth, useFirestore } from '@/firebase';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function RegisterPage() {
   const router = useRouter();
   const auth = useAuth();
   const db = useFirestore();
+  const { t } = useI18n();
   const [step, setStep] = useState(1);
   const [isVerifying, setIsVerifying] = useState(false);
   
@@ -181,14 +183,15 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0E1016] flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-[#0E1016] flex flex-col items-center justify-center p-6 relative">
+      {/* Botón de Regresar */}
       <div className="absolute top-8 left-8">
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-             <span className="text-white font-headline font-bold">A</span>
-          </div>
-          <span className="font-headline font-bold text-lg tracking-tight group-hover:text-primary transition-colors">AEON</span>
-        </Link>
+        <Button variant="ghost" asChild className="gap-2 text-muted-foreground hover:text-white transition-colors">
+          <Link href="/">
+            <ArrowLeft size={18} />
+            {t.common.back}
+          </Link>
+        </Button>
       </div>
 
       <div className="w-full max-w-lg">
@@ -250,7 +253,7 @@ export default function RegisterPage() {
             </CardContent>
             <CardFooter>
               <Button className="w-full glow-indigo group" onClick={handleNext}>
-                Siguiente <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
+                {t.common.next} <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
               </Button>
             </CardFooter>
           </Card>
@@ -313,7 +316,7 @@ export default function RegisterPage() {
                             Capturar Foto
                           </Button>
                           <Button size="sm" variant="destructive" onClick={() => setIsCameraActive(false)} className="rounded-full">
-                            Cancelar
+                            {t.common.cancel}
                           </Button>
                         </div>
                       </div>
@@ -345,8 +348,8 @@ export default function RegisterPage() {
               </div>
             </CardContent>
             <CardFooter className="flex gap-4">
-              <Button variant="outline" onClick={handlePrev} className="w-1/3 border-white/10">Atrás</Button>
-              <Button className="w-2/3 glow-indigo" onClick={handleNext} disabled={isCameraActive}>Continuar</Button>
+              <Button variant="outline" onClick={handlePrev} className="w-1/3 border-white/10">{t.common.back}</Button>
+              <Button className="w-2/3 glow-indigo" onClick={handleNext} disabled={isCameraActive}>{t.common.next}</Button>
             </CardFooter>
           </Card>
         )}
