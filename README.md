@@ -4,7 +4,7 @@ Bienvenido a **Aeon Digital Bank**, una plataforma de banca digital de alta prec
 
 ## 🚀 Cómo subir este proyecto a GitHub
 
-Para subir este proyecto a tu repositorio, abre una terminal en la raíz del proyecto y ejecuta los siguientes comandos:
+Para subir este proyecto a tu repositorio de GitHub, abre una terminal en la raíz del proyecto y ejecuta los siguientes comandos:
 
 ```bash
 git init
