@@ -42,7 +42,6 @@ export default function DashboardPage() {
 
   const recentTransactions = allTransactions.slice(0, 5);
 
-  // Cálculo del balance real basado en el ledger (historial) para máxima precisión
   const totals = useMemo(() => {
     return allTransactions.reduce((acc, tx) => {
       const amount = Number(tx.amount || 0);
@@ -53,8 +52,10 @@ export default function DashboardPage() {
   }, [allTransactions]);
 
   const realBalance = useMemo(() => {
-    return totals.income - totals.expenses;
-  }, [totals]);
+    // Priorizamos el balance del documento del usuario para cambios directos del admin
+    // pero mantenemos la lógica de ledger para asegurar que las estadísticas sean precisas
+    return Number(userData?.balance || 0);
+  }, [userData]);
 
   const activityData = useMemo(() => {
     const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];

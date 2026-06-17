@@ -149,7 +149,6 @@ export default function AdminUsersPage() {
     const userRef = doc(db, 'users', selectedUser.id);
     const txCollectionRef = collection(db, 'users', selectedUser.id, 'transactions');
 
-    // Actualización instantánea en UI
     updateDoc(userRef, {
       balance: increment(amount)
     }).catch(async () => {
@@ -189,13 +188,32 @@ export default function AdminUsersPage() {
     setIsProcessing(true);
 
     const userRef = doc(db, 'users', selectedUser.id);
+    
+    // Si el balance ha cambiado, crear una transacción de ajuste para mantener la integridad del ledger
+    const oldBalance = users.find(u => u.id === selectedUser.id)?.balance || 0;
+    const newBalance = Number(selectedUser.balance);
+    const difference = newBalance - oldBalance;
+
     const updateData = {
       fullName: selectedUser.fullName,
-      role: selectedUser.role
+      role: selectedUser.role,
+      balance: newBalance
     };
 
     updateDoc(userRef, updateData)
       .then(() => {
+        if (difference !== 0) {
+          addDoc(collection(db, "users", selectedUser.id, "transactions"), {
+            userId: selectedUser.id,
+            merchant: "Admin Balance Adjustment",
+            amount: Math.abs(difference),
+            category: "Adjustment",
+            status: "Completed",
+            date: new Date().toISOString(),
+            type: difference > 0 ? "income" : "expense",
+            reference: "Manual adjustment by admin"
+          });
+        }
         toast({ title: "User updated" });
       })
       .catch(async () => {
@@ -308,6 +326,10 @@ export default function AdminUsersPage() {
               <div className="space-y-2">
                 <Label>Name</Label>
                 <Input value={selectedUser.fullName} onChange={e => setSelectedUser({...selectedUser, fullName: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>Balance ($)</Label>
+                <Input type="number" value={selectedUser.balance} onChange={e => setSelectedUser({...selectedUser, balance: e.target.value})} />
               </div>
               <DialogFooter><Button type="submit" disabled={isProcessing}>Save Changes</Button></DialogFooter>
             </form>
