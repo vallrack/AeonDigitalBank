@@ -25,7 +25,8 @@ import {
   Trash2,
   ShieldAlert,
   PlusCircle,
-  ArrowUpCircle
+  ArrowUpCircle,
+  RefreshCw
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -148,7 +149,6 @@ export default function AdminUsersPage() {
     setIsProcessing(true);
 
     const amount = Number(depositAmount);
-    // Usamos selectedUser.id que viene del hook useCollection
     const userRef = doc(db, 'users', selectedUser.id);
     const txCollectionRef = collection(db, 'users', selectedUser.id, 'transactions');
 
@@ -176,6 +176,7 @@ export default function AdminUsersPage() {
       });
       setDepositOpen(false);
       setDepositAmount('');
+      setSelectedUser(null); // Limpiar para evitar datos obsoletos
     } catch (error: any) {
       const permissionError = new FirestorePermissionError({
         path: userRef.path,
@@ -204,6 +205,7 @@ export default function AdminUsersPage() {
       .then(() => {
         toast({ title: "User updated successfully" });
         setEditOpen(false);
+        setSelectedUser(null);
       })
       .catch(async () => {
         const permissionError = new FirestorePermissionError({
@@ -232,6 +234,11 @@ export default function AdminUsersPage() {
         errorEmitter.emit('permission-error', permissionError);
       });
   };
+
+  // Cálculo de reservas garantizando tipos numéricos
+  const totalReserves = useMemo(() => {
+    return users.reduce((acc, u) => acc + (Number(u.balance) || 0), 0);
+  }, [users]);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -317,7 +324,7 @@ export default function AdminUsersPage() {
                 <Label>Balance</Label>
                 <Input type="number" value={selectedUser.balance} onChange={e => setSelectedUser({...selectedUser, balance: e.target.value})} />
               </div>
-              <DialogFooter><Button type="submit" disabled={isProcessing}>Save</Button></DialogFooter>
+              <DialogFooter><Button type="submit" disabled={isProcessing}>Save Changes</Button></DialogFooter>
             </form>
           )}
         </DialogContent>
@@ -356,57 +363,80 @@ export default function AdminUsersPage() {
       </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="glass"><CardHeader><CardTitle>{users.length}</CardTitle><CardDescription>Total Clients</CardDescription></CardHeader></Card>
-        <Card className="glass"><CardHeader><CardTitle>{users.filter(u => u.role === 'admin').length}</CardTitle><CardDescription>Admins</CardDescription></CardHeader></Card>
-        <Card className="glass"><CardHeader><CardTitle>${users.reduce((acc, u) => acc + (u.balance || 0), 0).toLocaleString()}</CardTitle><CardDescription>Reserves</CardDescription></CardHeader></Card>
+        <Card className="glass border-white/5">
+          <CardHeader>
+            <CardTitle>{users.length}</CardTitle>
+            <CardDescription>Total Clients</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card className="glass border-white/5">
+          <CardHeader>
+            <CardTitle>{users.filter(u => u.role === 'admin').length}</CardTitle>
+            <CardDescription>Admins</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card className="glass border-white/5">
+          <CardHeader>
+            <CardTitle>${totalReserves.toLocaleString()}</CardTitle>
+            <CardDescription>Total Reserves</CardDescription>
+          </CardHeader>
+        </Card>
       </div>
 
-      <Card className="glass">
+      <Card className="glass border-white/5">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8"><AvatarImage src={`https://picsum.photos/seed/${u.id}/100/100`} /><AvatarFallback>{u.fullName?.[0]}</AvatarFallback></Avatar>
-                      <div>
-                        <div className="font-bold text-sm">{u.fullName}</div>
-                        <Badge variant="secondary" className="text-[8px] h-3">{u.role}</Badge>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{u.email}</TableCell>
-                  <TableCell className="text-right font-bold text-accent">${(Number(u.balance) || 0).toLocaleString()}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical size={14} /></Button></DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="glass">
-                        <DropdownMenuItem onClick={() => { setSelectedUser(u); setDepositOpen(true); }}>
-                          <ArrowUpCircle size={12} className="mr-2 text-emerald-400"/>Deposit Funds
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setSelectedUser(u); setEditOpen(true); }}>
-                          <Edit size={12} className="mr-2"/>Edit Profile
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-white/5" />
-                        <DropdownMenuItem onClick={() => handleDeleteUser(u.id)} className="text-destructive">
-                          <Trash2 size={12} className="mr-2"/>Delete User
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          {loading ? (
+            <div className="flex justify-center p-12"><Loader2 className="animate-spin text-primary" /></div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-white/5">
+                  <TableHead>User</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((u) => (
+                  <TableRow key={u.id} className="border-white/5 hover:bg-white/5">
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8"><AvatarImage src={`https://picsum.photos/seed/${u.id}/100/100`} /><AvatarFallback>{u.fullName?.[0]}</AvatarFallback></Avatar>
+                        <div>
+                          <div className="font-bold text-sm">{u.fullName}</div>
+                          <Badge variant="secondary" className="text-[8px] h-3">{u.role}</Badge>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{u.email}</TableCell>
+                    <TableCell className="text-right font-bold text-accent">
+                      ${(Number(u.balance) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon"><MoreVertical size={14} /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="glass border-white/10">
+                          <DropdownMenuItem onClick={() => { setSelectedUser(u); setDepositOpen(true); }}>
+                            <ArrowUpCircle size={12} className="mr-2 text-emerald-400"/>Deposit Funds
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setSelectedUser(u); setEditOpen(true); }}>
+                            <Edit size={12} className="mr-2"/>Edit Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-white/5" />
+                          <DropdownMenuItem onClick={() => handleDeleteUser(u.id)} className="text-destructive">
+                            <Trash2 size={12} className="mr-2"/>Delete User
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
