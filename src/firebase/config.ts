@@ -1,10 +1,10 @@
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyBHZKfuxWe3UjaAP3ll1d6EBjnnnzvJnV4",
-  authDomain: "fakebank-a7323.firebaseapp.com",
-  projectId: "fakebank-a7323",
-  storageBucket: "fakebank-a7323.firebasestorage.app",
-  messagingSenderId: "209315863170",
-  appId: "1:209315863170:web:260246232ffd91c37c729b",
-  measurementId: "G-DVG7RR1CC3"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
