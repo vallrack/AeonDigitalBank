@@ -189,8 +189,8 @@ export default function AdminUsersPage() {
 
     const userRef = doc(db, 'users', selectedUser.id);
     
-    // Si el balance ha cambiado, crear una transacción de ajuste para mantener la integridad del ledger
-    const oldBalance = users.find(u => u.id === selectedUser.id)?.balance || 0;
+    const originalUser = users.find(u => u.id === selectedUser.id);
+    const oldBalance = Number(originalUser?.balance || 0);
     const newBalance = Number(selectedUser.balance);
     const difference = newBalance - oldBalance;
 
@@ -258,7 +258,10 @@ export default function AdminUsersPage() {
           <p className="text-muted-foreground">Admin panel for supervising and registering users.</p>
         </div>
 
-        <Dialog open={registerOpen} onOpenChange={setRegisterOpen}>
+        <Dialog open={registerOpen} onOpenChange={(open) => {
+          setRegisterOpen(open);
+          if (!open) setNewUserData({ fullName: '', email: '', password: '', balance: 5000 });
+        }}>
           <DialogTrigger asChild>
             <Button className="gap-2 glow-indigo">
               <UserPlus size={16} />
@@ -318,7 +321,10 @@ export default function AdminUsersPage() {
         </Dialog>
       </div>
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog open={editOpen} onOpenChange={(open) => {
+        setEditOpen(open);
+        if (!open) setSelectedUser(null);
+      }}>
         <DialogContent className="glass border-white/10 sm:max-w-[425px]">
           <DialogHeader><DialogTitle>Edit Client</DialogTitle></DialogHeader>
           {selectedUser && (
@@ -337,7 +343,13 @@ export default function AdminUsersPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
+      <Dialog open={depositOpen} onOpenChange={(open) => {
+        setDepositOpen(open);
+        if (!open) {
+          setSelectedUser(null);
+          setDepositAmount('');
+        }
+      }}>
         <DialogContent className="glass border-white/10 sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Deposit Funds</DialogTitle>
