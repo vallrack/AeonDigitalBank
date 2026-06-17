@@ -82,13 +82,6 @@ export default function DashboardPage() {
     );
   }
 
-  const formatCurrency = (val: number) => {
-    return val.toLocaleString('es-ES', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
-
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -112,7 +105,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <BalanceWidget 
-          balance={userData?.balance || 0} 
+          balance={Number(userData?.balance) || 0} 
           income={totals.income}
           expenses={totals.expenses}
         />
@@ -192,7 +185,7 @@ export default function DashboardPage() {
                         tx.type === 'expense' ? "text-rose-400" : "text-emerald-400"
                       )}>
                         <PrivacyMask>
-                          {tx.type === 'expense' ? '-' : '+'}${formatCurrency(Math.abs(tx.amount))}
+                          {tx.type === 'expense' ? '-' : '+'}${ (Number(Math.abs(tx.amount)) || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
                         </PrivacyMask>
                       </TableCell>
                       <TableCell>

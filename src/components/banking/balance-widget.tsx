@@ -18,8 +18,9 @@ export function BalanceWidget({
   expenses = 0 
 }: BalanceWidgetProps) {
   // Formateador de moneda consistente (Formato: $5.000,00)
-  const formatCurrency = (val: number) => {
-    return val.toLocaleString('es-ES', {
+  const formatCurrency = (val: any) => {
+    const num = Number(val) || 0;
+    return num.toLocaleString('es-ES', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });

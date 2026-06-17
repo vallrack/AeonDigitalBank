@@ -148,25 +148,26 @@ export default function AdminUsersPage() {
     setIsProcessing(true);
 
     const amount = Number(depositAmount);
-    const userRef = doc(db, 'users', selectedUser.uid);
-    const txCollectionRef = collection(db, 'users', selectedUser.uid, 'transactions');
+    // Usamos selectedUser.id que viene del hook useCollection
+    const userRef = doc(db, 'users', selectedUser.id);
+    const txCollectionRef = collection(db, 'users', selectedUser.id, 'transactions');
 
     try {
-      // 1. Actualizar balance
+      // 1. Actualizar balance de forma atómica
       await updateDoc(userRef, {
         balance: increment(amount)
       });
 
       // 2. Registrar transacción
       await addDoc(txCollectionRef, {
-        userId: selectedUser.uid,
+        userId: selectedUser.id,
         merchant: "Admin Manual Deposit",
         amount: amount,
         category: "Income",
         status: "Completed",
         date: new Date().toISOString(),
         type: "income",
-        reference: "Filtro de administrador"
+        reference: "Depósito de administrador"
       });
 
       toast({ 
@@ -192,7 +193,7 @@ export default function AdminUsersPage() {
     if (!selectedUser) return;
     setIsProcessing(true);
 
-    const userRef = doc(db, 'users', selectedUser.uid);
+    const userRef = doc(db, 'users', selectedUser.id);
     const updateData = {
       fullName: selectedUser.fullName,
       balance: Number(selectedUser.balance),
@@ -373,10 +374,10 @@ export default function AdminUsersPage() {
             </TableHeader>
             <TableBody>
               {filteredUsers.map((u) => (
-                <TableRow key={u.uid}>
+                <TableRow key={u.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8"><AvatarImage src={`https://picsum.photos/seed/${u.uid}/100/100`} /><AvatarFallback>{u.fullName?.[0]}</AvatarFallback></Avatar>
+                      <Avatar className="h-8 w-8"><AvatarImage src={`https://picsum.photos/seed/${u.id}/100/100`} /><AvatarFallback>{u.fullName?.[0]}</AvatarFallback></Avatar>
                       <div>
                         <div className="font-bold text-sm">{u.fullName}</div>
                         <Badge variant="secondary" className="text-[8px] h-3">{u.role}</Badge>
@@ -384,7 +385,7 @@ export default function AdminUsersPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{u.email}</TableCell>
-                  <TableCell className="text-right font-bold text-accent">${(u.balance || 0).toLocaleString()}</TableCell>
+                  <TableCell className="text-right font-bold text-accent">${(Number(u.balance) || 0).toLocaleString()}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical size={14} /></Button></DropdownMenuTrigger>
@@ -396,7 +397,7 @@ export default function AdminUsersPage() {
                           <Edit size={12} className="mr-2"/>Edit Profile
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-white/5" />
-                        <DropdownMenuItem onClick={() => handleDeleteUser(u.uid)} className="text-destructive">
+                        <DropdownMenuItem onClick={() => handleDeleteUser(u.id)} className="text-destructive">
                           <Trash2 size={12} className="mr-2"/>Delete User
                         </DropdownMenuItem>
                       </DropdownMenuContent>
