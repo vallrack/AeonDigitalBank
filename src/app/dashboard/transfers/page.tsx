@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2, Search, User, CreditCard, Sparkles } from 'lucide-react';
-import { useUser, useFirestore, useDoc, useCollection } from '@/firebase';
+import { useUser, useFirestore, useDoc } from '@/firebase';
 import { doc, collection, writeBatch, increment, getDocs, query, where, limit } from 'firebase/firestore';
 import { predictiveFraudMonitoring } from '@/ai/flows/predictive-fraud-monitoring';
 import { intelligentExpenseCategorization } from '@/ai/flows/intelligent-expense-categorization';
@@ -38,19 +38,30 @@ export default function TransfersPage() {
     setIsProcessing(true);
     try {
       let foundUser = null;
-      const cleanQuery = searchQuery.toLowerCase().trim();
+      const cleanQuery = searchQuery.trim();
 
+      // Buscar por Email
       if (cleanQuery.includes('@')) {
-        const q = query(collection(db, 'users'), where('email', '==', cleanQuery), limit(1));
+        const q = query(collection(db, 'users'), where('email', '==', cleanQuery.toLowerCase()), limit(1));
         const snap = await getDocs(q);
         if (!snap.empty) foundUser = snap.docs[0].data();
       } 
+      // Buscar por Número de Tarjeta (Ecosistema interno)
+      else if (cleanQuery.length >= 10) {
+        const q = query(collectionGroup(db, 'virtualCards'), where('cardNumber', '==', cleanQuery), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const cardData = snap.docs[0].data();
+          const userSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', cardData.userId), limit(1)));
+          if (!userSnap.empty) foundUser = userSnap.docs[0].data();
+        }
+      }
 
       if (!foundUser) {
         toast({
           variant: "destructive",
           title: "Destinatario no encontrado",
-          description: "Asegúrate de que el email pertenezca a un cliente activo de AEON."
+          description: "Solo se permiten transferencias a clientes activos o tarjetas de la Red AEON."
         });
       } else if (foundUser.uid === user?.uid) {
         toast({ variant: "destructive", title: "Operación no válida", description: "No puedes transferirte a ti mismo." });
@@ -59,7 +70,7 @@ export default function TransfersPage() {
         setStep(2);
       }
     } catch (error) {
-      toast({ variant: "destructive", title: "Error de búsqueda", description: "No se pudo verificar el usuario." });
+      toast({ variant: "destructive", title: "Error de búsqueda", description: "Hubo un problema al validar el destinatario en la red AEON." });
     } finally {
       setIsProcessing(false);
     }
@@ -144,7 +155,8 @@ export default function TransfersPage() {
       date: new Date().toISOString(),
       type: 'expense',
       reference: reference,
-      recipientId: recipientUser.uid
+      recipientId: recipientUser.uid,
+      network: 'AEON_INTERNAL'
     });
 
     batch.set(recipientTxRef, {
@@ -156,7 +168,8 @@ export default function TransfersPage() {
       date: new Date().toISOString(),
       type: 'income',
       reference: reference,
-      senderId: user.uid
+      senderId: user.uid,
+      network: 'AEON_INTERNAL'
     });
 
     batch.update(senderUserRef, { balance: increment(-numAmount) });
@@ -182,7 +195,7 @@ export default function TransfersPage() {
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-headline font-bold">Transferencia de Fondos</h1>
-        <p className="text-muted-foreground">Ecosistema cerrado de pagos de alta precisión.</p>
+        <p className="text-muted-foreground">Ecosistema cerrado de pagos AEON Network.</p>
       </div>
 
       {step === 1 && (
@@ -192,16 +205,16 @@ export default function TransfersPage() {
               <Search className="text-primary" size={20} />
               Buscar Destinatario AEON
             </CardTitle>
-            <CardDescription>Busca por email verificado en la red AEON.</CardDescription>
+            <CardDescription>Email verificado o número de tarjeta AEON.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="search">Identificador del Cliente</Label>
               <div className="relative">
-                <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <CreditCard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input 
                   id="search" 
-                  placeholder="Introduce el email del destinatario" 
+                  placeholder="Email o número de tarjeta AEON" 
                   className="pl-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -211,7 +224,7 @@ export default function TransfersPage() {
             </div>
             <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
               <p className="text-[10px] text-primary font-bold uppercase tracking-widest mb-1">Nota de Seguridad</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">Las transferencias entre cuentas AEON son instantáneas y gratuitas.</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">Solo se permiten transferencias entre cuentas y tarjetas activas dentro del sistema AEON Digital.</p>
             </div>
           </CardContent>
           <CardFooter>
@@ -233,7 +246,7 @@ export default function TransfersPage() {
                 <CardTitle className="text-lg">{recipientUser?.fullName}</CardTitle>
                 <CardDescription className="flex items-center gap-2">
                   <ShieldCheck size={12} className="text-emerald-400" />
-                  Cliente Verificado AEON
+                  Red de Confianza AEON
                 </CardDescription>
               </div>
             </div>
@@ -256,7 +269,7 @@ export default function TransfersPage() {
                 </div>
                 <div className="flex justify-between text-[10px] text-muted-foreground">
                   <span>Tu saldo: ${(userData?.balance || 0).toLocaleString()}</span>
-                  <span>Sin comisiones internas</span>
+                  <span>Sin comisiones bancarias externas</span>
                 </div>
               </div>
 
@@ -264,7 +277,7 @@ export default function TransfersPage() {
                 <Label htmlFor="reference">Referencia / Concepto</Label>
                 <Textarea 
                   id="reference" 
-                  placeholder="¿Por qué envías este dinero?" 
+                  placeholder="Descripción de la transferencia" 
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
                   onBlur={handleRefBlur}
@@ -275,7 +288,7 @@ export default function TransfersPage() {
                     isAiLoading ? "bg-muted animate-pulse" : "bg-accent/20 text-accent"
                   )}>
                     {isAiLoading ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-                    Categoría IA: {aiCategory}
+                    Categorización IA: {aiCategory}
                   </div>
                 </div>
               </div>
@@ -300,7 +313,7 @@ export default function TransfersPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   {fraudResult?.isSuspicious ? <AlertTriangle className="text-amber-500" /> : <ShieldCheck className="text-emerald-500" />}
-                  Análisis de Seguridad AI
+                  Validación de Seguridad
                 </CardTitle>
                 <span className={cn(
                   "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
@@ -312,20 +325,20 @@ export default function TransfersPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm leading-relaxed">{fraudResult?.reason || "Operación dentro de los parámetros normales del ecosistema AEON."}</p>
+              <p className="text-sm leading-relaxed">{fraudResult?.reason || "Operación verificada dentro de la Red AEON."}</p>
               <div className="bg-background/50 p-6 rounded-xl space-y-3 border border-white/5">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Destinatario:</span>
                   <span className="font-bold">{recipientUser?.fullName}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-white/5">
-                  <span className="text-muted-foreground text-xs">Total a transferir:</span>
+                  <span className="text-muted-foreground text-xs">Monto Neto:</span>
                   <span className="font-headline font-bold text-2xl text-accent">${parseFloat(amount).toFixed(2)}</span>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="flex gap-4">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>Modificar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>Editar</Button>
               <Button 
                 className={cn("flex-1", fraudResult?.isSuspicious ? "bg-amber-500 hover:bg-amber-600" : "glow-indigo")} 
                 onClick={confirmTransfer}
@@ -345,8 +358,8 @@ export default function TransfersPage() {
               <CheckCircle2 className="text-emerald-500" size={40} />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-headline font-bold">Transferencia Realizada</h2>
-              <p className="text-muted-foreground">Has enviado ${parseFloat(amount).toFixed(2)} a {recipientUser?.fullName} exitosamente.</p>
+              <h2 className="text-2xl font-headline font-bold">Envío Confirmado</h2>
+              <p className="text-muted-foreground">Se han transferido ${parseFloat(amount).toFixed(2)} exitosamente dentro de la Red AEON.</p>
             </div>
             <Button className="w-full glow-indigo" onClick={() => {
               setStep(1);
@@ -356,7 +369,7 @@ export default function TransfersPage() {
               setReference('');
               setAiCategory('Transfer');
             }}>
-              Nueva Transferencia
+              Nueva Operación
             </Button>
           </CardContent>
         </Card>
@@ -364,3 +377,4 @@ export default function TransfersPage() {
     </div>
   );
 }
+import { collectionGroup } from 'firebase/firestore';

@@ -55,7 +55,7 @@ function TopNav({ userData }: { userData: any }) {
         <div className="hidden md:flex relative w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search transactions..." 
+            placeholder="Buscar en AEON..." 
             className="pl-9 bg-muted/50 border-none focus-visible:ring-1"
           />
         </div>
@@ -99,7 +99,7 @@ function DashboardSidebar({ userData }: { userData: any }) {
       await signOut(auth);
       router.push('/login');
     } catch (error) {
-      console.error("Error signing out", error);
+      // Error handled by Firebase error listener
     }
   };
 
@@ -134,21 +134,24 @@ function DashboardSidebar({ userData }: { userData: any }) {
           <SidebarGroupLabel>Banking</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={pathname === item.href}
-                    tooltip={item.label}
-                    className={pathname === item.href ? "bg-primary/10 text-primary" : ""}
-                  >
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {menuItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={isActive}
+                      tooltip={item.label}
+                      className={isActive ? "bg-primary/10 text-primary font-bold" : ""}
+                    >
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -180,21 +183,24 @@ function DashboardSidebar({ userData }: { userData: any }) {
           <SidebarGroupLabel>Support</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {secondaryItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={pathname === item.href}
-                    tooltip={item.label}
-                    className={pathname === item.href ? "bg-muted/50 text-foreground" : ""}
-                  >
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {secondaryItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={isActive}
+                      tooltip={item.label}
+                      className={isActive ? "bg-muted/50 text-foreground" : ""}
+                    >
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -222,27 +228,23 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
   const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
   const { data: userData, loading: docLoading } = useDoc(userRef);
 
-  // Lógica de inicialización de perfil
   useEffect(() => {
     if (!userLoading && user && !docLoading && !userData) {
       const initializeProfile = async () => {
         let isFirstUser = false;
         try {
-          // Intentamos ver si hay otros usuarios para asignar rol de admin
           const usersSnap = await getDocs(query(collection(db, "users"), limit(1)));
           isFirstUser = usersSnap.empty;
         } catch (e) {
-          // Si falla por permisos, asumimos que no es el primero, 
-          // a menos que sea el email del administrador principal
+          // Silent catch for initial permission checks
         }
 
-        // Forzar admin para el email específico del usuario
         const finalRole = (isFirstUser || user.email === 'vallrack67@gmail.com') ? 'admin' : 'user';
         
         const profileData = {
           uid: user.uid,
           email: user.email,
-          fullName: user.displayName || user.email?.split('@')[0] || 'New User',
+          fullName: user.displayName || user.email?.split('@')[0] || 'Nuevo Cliente',
           balance: 5000,
           role: finalRole,
           createdAt: serverTimestamp(),
