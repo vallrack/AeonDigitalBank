@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2, Search, User, CreditCard, Sparkles } from 'lucide-react';
 import { useUser, useFirestore, useDoc } from '@/firebase';
-import { doc, collection, writeBatch, increment, getDocs, query, where, limit } from 'firebase/firestore';
+import { doc, collection, writeBatch, increment, getDocs, query, where, limit, collectionGroup } from 'firebase/firestore';
 import { predictiveFraudMonitoring } from '@/ai/flows/predictive-fraud-monitoring';
 import { intelligentExpenseCategorization } from '@/ai/flows/intelligent-expense-categorization';
 import { toast } from '@/hooks/use-toast';
@@ -40,20 +40,25 @@ export default function TransfersPage() {
       let foundUser = null;
       const cleanQuery = searchQuery.trim();
 
-      // Buscar por Email
+      // 1. Intentar buscar por Email
       if (cleanQuery.includes('@')) {
         const q = query(collection(db, 'users'), where('email', '==', cleanQuery.toLowerCase()), limit(1));
         const snap = await getDocs(q);
-        if (!snap.empty) foundUser = snap.docs[0].data();
+        if (!snap.empty) {
+          foundUser = snap.docs[0].data();
+        }
       } 
-      // Buscar por Número de Tarjeta (Ecosistema interno)
+      // 2. Intentar buscar por Número de Tarjeta AEON
       else if (cleanQuery.length >= 10) {
         const q = query(collectionGroup(db, 'virtualCards'), where('cardNumber', '==', cleanQuery), limit(1));
         const snap = await getDocs(q);
         if (!snap.empty) {
           const cardData = snap.docs[0].data();
+          // Obtener el perfil del dueño de la tarjeta
           const userSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', cardData.userId), limit(1)));
-          if (!userSnap.empty) foundUser = userSnap.docs[0].data();
+          if (!userSnap.empty) {
+            foundUser = userSnap.docs[0].data();
+          }
         }
       }
 
@@ -61,16 +66,24 @@ export default function TransfersPage() {
         toast({
           variant: "destructive",
           title: "Destinatario no encontrado",
-          description: "Solo se permiten transferencias a clientes activos o tarjetas de la Red AEON."
+          description: "Verifica que el email o número de tarjeta pertenezca a la Red AEON."
         });
       } else if (foundUser.uid === user?.uid) {
-        toast({ variant: "destructive", title: "Operación no válida", description: "No puedes transferirte a ti mismo." });
+        toast({ 
+          variant: "destructive", 
+          title: "Operación no válida", 
+          description: "No puedes realizar transferencias a tu propia cuenta." 
+        });
       } else {
         setRecipientUser(foundUser);
         setStep(2);
       }
     } catch (error) {
-      toast({ variant: "destructive", title: "Error de búsqueda", description: "Hubo un problema al validar el destinatario en la red AEON." });
+      toast({ 
+        variant: "destructive", 
+        title: "Error de búsqueda", 
+        description: "Hubo un problema al validar el destinatario en el ecosistema AEON." 
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -81,7 +94,7 @@ export default function TransfersPage() {
     setIsAiLoading(true);
     try {
       const result = await intelligentExpenseCategorization({
-        merchant: recipientUser?.fullName || 'AEON Transfer',
+        merchant: recipientUser?.fullName || 'AEON Internal',
         description: reference,
         amount: parseFloat(amount) || 0
       });
@@ -115,7 +128,7 @@ export default function TransfersPage() {
           currency: 'USD',
           timestamp: new Date().toISOString(),
           merchant: recipientUser.fullName,
-          location: 'AEON Secure Network'
+          location: 'AEON Secure Node'
         },
         userContext: {
           transactionHistory: [], 
@@ -128,7 +141,7 @@ export default function TransfersPage() {
       setFraudResult(analysis);
       setStep(3);
     } catch (error) {
-      setStep(3);
+      setStep(3); // Continuar incluso si falla la IA (fallback)
     } finally {
       setIsProcessing(false);
     }
@@ -146,6 +159,7 @@ export default function TransfersPage() {
     const senderUserRef = doc(db, 'users', user.uid);
     const recipientUserRef = doc(db, 'users', recipientUser.uid);
 
+    // 1. Transacción del emisor (Gasto)
     batch.set(senderTxRef, {
       userId: user.uid,
       merchant: `Transferencia a ${recipientUser.fullName}`,
@@ -159,6 +173,7 @@ export default function TransfersPage() {
       network: 'AEON_INTERNAL'
     });
 
+    // 2. Transacción del receptor (Ingreso)
     batch.set(recipientTxRef, {
       userId: recipientUser.uid,
       merchant: `Transferencia de ${userData.fullName}`,
@@ -172,6 +187,7 @@ export default function TransfersPage() {
       network: 'AEON_INTERNAL'
     });
 
+    // 3. Actualizar balances atómicamente
     batch.update(senderUserRef, { balance: increment(-numAmount) });
     batch.update(recipientUserRef, { balance: increment(numAmount) });
 
@@ -195,7 +211,7 @@ export default function TransfersPage() {
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-headline font-bold">Transferencia de Fondos</h1>
-        <p className="text-muted-foreground">Ecosistema cerrado de pagos AEON Network.</p>
+        <p className="text-muted-foreground">Ecosistema de pagos internos AEON Network.</p>
       </div>
 
       {step === 1 && (
@@ -203,9 +219,9 @@ export default function TransfersPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
               <Search className="text-primary" size={20} />
-              Buscar Destinatario AEON
+              Buscar Destinatario
             </CardTitle>
-            <CardDescription>Email verificado o número de tarjeta AEON.</CardDescription>
+            <CardDescription>Ingresa el email o número de tarjeta AEON del receptor.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -224,7 +240,9 @@ export default function TransfersPage() {
             </div>
             <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
               <p className="text-[10px] text-primary font-bold uppercase tracking-widest mb-1">Nota de Seguridad</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">Solo se permiten transferencias entre cuentas y tarjetas activas dentro del sistema AEON Digital.</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Solo se permiten movimientos entre cuentas activas dentro del sistema de alta precisión AEON Digital.
+              </p>
             </div>
           </CardContent>
           <CardFooter>
@@ -269,7 +287,7 @@ export default function TransfersPage() {
                 </div>
                 <div className="flex justify-between text-[10px] text-muted-foreground">
                   <span>Tu saldo: ${(userData?.balance || 0).toLocaleString()}</span>
-                  <span>Sin comisiones bancarias externas</span>
+                  <span>Sin comisiones bancarias</span>
                 </div>
               </div>
 
@@ -277,7 +295,7 @@ export default function TransfersPage() {
                 <Label htmlFor="reference">Referencia / Concepto</Label>
                 <Textarea 
                   id="reference" 
-                  placeholder="Descripción de la transferencia" 
+                  placeholder="¿Cuál es el motivo del envío?" 
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
                   onBlur={handleRefBlur}
@@ -296,7 +314,7 @@ export default function TransfersPage() {
             <CardFooter className="flex gap-4">
               <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Atrás</Button>
               <Button type="submit" className="flex-1 glow-indigo" disabled={isProcessing}>
-                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Continuar"}
+                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Revisar Operación"}
               </Button>
             </CardFooter>
           </form>
@@ -320,12 +338,12 @@ export default function TransfersPage() {
                   fraudResult?.alertLevel === 'High' ? "bg-rose-500" : 
                   fraudResult?.alertLevel === 'Medium' ? "bg-amber-500" : "bg-emerald-500"
                 )}>
-                  Riesgo: {fraudResult?.alertLevel || 'Nulo'}
+                  Nivel de Riesgo: {fraudResult?.alertLevel || 'Nulo'}
                 </span>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm leading-relaxed">{fraudResult?.reason || "Operación verificada dentro de la Red AEON."}</p>
+              <p className="text-sm leading-relaxed">{fraudResult?.reason || "Operación verificada dentro de los parámetros de la Red AEON."}</p>
               <div className="bg-background/50 p-6 rounded-xl space-y-3 border border-white/5">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Destinatario:</span>
@@ -358,8 +376,10 @@ export default function TransfersPage() {
               <CheckCircle2 className="text-emerald-500" size={40} />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-headline font-bold">Envío Confirmado</h2>
-              <p className="text-muted-foreground">Se han transferido ${parseFloat(amount).toFixed(2)} exitosamente dentro de la Red AEON.</p>
+              <h2 className="text-2xl font-headline font-bold">Transferencia Exitosa</h2>
+              <p className="text-muted-foreground">
+                Se han enviado ${parseFloat(amount).toFixed(2)} a {recipientUser?.fullName}. El saldo del receptor ha sido actualizado de inmediato.
+              </p>
             </div>
             <Button className="w-full glow-indigo" onClick={() => {
               setStep(1);
@@ -369,7 +389,7 @@ export default function TransfersPage() {
               setReference('');
               setAiCategory('Transfer');
             }}>
-              Nueva Operación
+              Realizar otra transferencia
             </Button>
           </CardContent>
         </Card>
@@ -377,4 +397,3 @@ export default function TransfersPage() {
     </div>
   );
 }
-import { collectionGroup } from 'firebase/firestore';
