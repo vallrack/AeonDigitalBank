@@ -52,8 +52,8 @@ export default function DashboardPage() {
   }, [allTransactions]);
 
   const realBalance = useMemo(() => {
-    // Priorizamos el balance del documento del usuario para cambios directos del admin
-    // pero mantenemos la lógica de ledger para asegurar que las estadísticas sean precisas
+    // Fuente de verdad: el campo 'balance' del documento del usuario
+    // Este campo es el que el Administrador edita manualmente
     return Number(userData?.balance || 0);
   }, [userData]);
 
