@@ -19,7 +19,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col bg-[#0E1016]">
       {/* Navbar */}
-      <nav className="h-20 flex items-center justify-between px-6 md:px-12 fixed top-0 w-full z-50 glass border-b border-white/5">
+      <nav className="h-20 flex items-center justify-between px-4 md:px-12 fixed top-0 w-full z-50 glass border-b border-white/5">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center glow-indigo">
             <span className="text-white font-headline font-bold text-xl">A</span>
@@ -53,10 +53,10 @@ export default function LandingPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="ghost" asChild className="hidden xs:inline-flex">
+          <Button variant="ghost" asChild className="text-sm sm:text-base px-3 sm:px-4">
             <Link href="/login">{t.common.log_in}</Link>
           </Button>
-          <Button className="glow-indigo rounded-full px-4 sm:px-6" asChild>
+          <Button className="glow-indigo rounded-full px-4 sm:px-6 text-sm sm:text-base" asChild>
             <Link href="/register">{t.common.get_started}</Link>
           </Button>
         </div>
