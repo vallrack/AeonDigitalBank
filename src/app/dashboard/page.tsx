@@ -29,7 +29,6 @@ export default function DashboardPage() {
 
   const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
   
-  // Obtenemos todas las transacciones para los cálculos del dashboard
   const allTransactionsQuery = useMemo(() => {
     if (!user) return null;
     return query(
@@ -41,26 +40,21 @@ export default function DashboardPage() {
   const { data: userData, loading: profileLoading } = useDoc(userRef);
   const { data: allTransactions, loading: txLoading } = useCollection(allTransactionsQuery);
 
-  // Transacciones recientes para la tabla (las últimas 5)
   const recentTransactions = allTransactions.slice(0, 5);
 
-  // Cálculo de totales reales
   const totals = useMemo(() => {
     return allTransactions.reduce((acc, tx) => {
-      const amount = Math.abs(tx.amount || 0);
+      const amount = Number(tx.amount || 0);
       if (tx.type === 'income') acc.income += amount;
       else if (tx.type === 'expense') acc.expenses += amount;
       return acc;
     }, { income: 0, expenses: 0 });
   }, [allTransactions]);
 
-  // Procesamiento de datos para el gráfico (últimos 7 días o genérico si no hay suficientes)
   const activityData = useMemo(() => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const currentDay = new Date().getDay();
-    
-    // Inicializamos los últimos 7 días con 0
+    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     const dataMap: Record<string, { day: string, income: number, expense: number, order: number }> = {};
+    
     for (let i = 0; i < 7; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -68,13 +62,12 @@ export default function DashboardPage() {
       dataMap[dayLabel] = { day: dayLabel, income: 0, expense: 0, order: 6 - i };
     }
 
-    // Llenamos con datos reales si existen
     allTransactions.forEach(tx => {
       const txDate = new Date(tx.date);
       const dayLabel = days[txDate.getDay()];
       if (dataMap[dayLabel]) {
-        if (tx.type === 'income') dataMap[dayLabel].income += tx.amount;
-        else dataMap[dayLabel].expense += tx.amount;
+        if (tx.type === 'income') dataMap[dayLabel].income += Number(tx.amount);
+        else dataMap[dayLabel].expense += Number(tx.amount);
       }
     });
 
@@ -89,22 +82,29 @@ export default function DashboardPage() {
     );
   }
 
+  const formatCurrency = (val: number) => {
+    return val.toLocaleString('es-ES', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Welcome back, {userData?.fullName?.split(' ')[0] || 'User'}</h1>
-          <p className="text-muted-foreground">Here's what's happening with your accounts today.</p>
+          <h1 className="text-3xl font-headline font-bold">Bienvenido, {userData?.fullName?.split(' ')[0] || 'Usuario'}</h1>
+          <p className="text-muted-foreground">Estado actual de tus cuentas en la Red AEON.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-2">
             <Download size={14} />
-            Export Statement
+            Exportar Estado
           </Button>
           <Button size="sm" className="gap-2 glow-indigo" asChild>
             <Link href="/dashboard/transfers">
               <Plus size={14} />
-              New Transfer
+              Nueva Transferencia
             </Link>
           </Button>
         </div>
@@ -120,8 +120,8 @@ export default function DashboardPage() {
         <Card className="md:col-span-2 glass border-primary/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
-              <CardTitle className="text-base font-headline font-medium">Weekly Financial Activity</CardTitle>
-              <CardDescription className="text-xs">Income and expenses over the last 7 days.</CardDescription>
+              <CardTitle className="text-base font-headline font-medium">Actividad Semanal</CardTitle>
+              <CardDescription className="text-xs">Flujo de ingresos y gastos (7 días).</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="h-[200px] w-full mt-4">
@@ -132,27 +132,27 @@ export default function DashboardPage() {
                   dataKey="day" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: '#888', fontSize: 12 }}
+                  tick={{ fill: '#888', fontSize: 10 }}
                 />
                 <Tooltip 
                   cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                   contentStyle={{ backgroundColor: '#0E1016', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
                 />
-                <Bar dataKey="income" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} barSize={12} />
-                <Bar dataKey="expense" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} barSize={12} />
+                <Bar dataKey="income" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} barSize={10} />
+                <Bar dataKey="expense" fill="hsl(var(--accent))" radius={[2, 2, 0, 0]} barSize={10} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <Card className="glass border-primary/5">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-headline font-bold">Recent Transactions</CardTitle>
+            <CardTitle className="text-lg font-headline font-bold">Transacciones Recientes</CardTitle>
             <Button variant="ghost" size="sm" className="text-primary hover:text-accent font-medium gap-1" asChild>
               <Link href="/dashboard/activity">
-                View All <ChevronRight size={14} />
+                Ver Todo <ChevronRight size={14} />
               </Link>
             </Button>
           </CardHeader>
@@ -160,15 +160,15 @@ export default function DashboardPage() {
             {txLoading ? (
               <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
             ) : recentTransactions.length === 0 ? (
-              <div className="text-center p-8 text-muted-foreground">No transactions found.</div>
+              <div className="text-center p-8 text-muted-foreground">No hay transacciones registradas.</div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow className="border-border/50 hover:bg-transparent">
-                    <TableHead className="text-xs uppercase tracking-wider font-semibold">Merchant / Recipient</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wider font-semibold">Category</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wider font-semibold text-right">Amount</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wider font-semibold">Status</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wider font-semibold">Concepto / Destinatario</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wider font-semibold">Categoría</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wider font-semibold text-right">Monto</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wider font-semibold">Estado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -176,14 +176,14 @@ export default function DashboardPage() {
                     <TableRow key={tx.id} className="border-border/30 hover:bg-muted/30">
                       <TableCell className="font-medium">
                         <div className="flex flex-col">
-                          <span>{tx.merchant}</span>
+                          <span className="text-sm">{tx.merchant}</span>
                           <span className="text-[10px] text-muted-foreground">
                             {tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}
                           </span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="text-[10px] font-normal py-0">
+                        <Badge variant="secondary" className="text-[9px] font-normal py-0">
                           {tx.category}
                         </Badge>
                       </TableCell>
@@ -192,7 +192,7 @@ export default function DashboardPage() {
                         tx.type === 'expense' ? "text-rose-400" : "text-emerald-400"
                       )}>
                         <PrivacyMask>
-                          {tx.type === 'expense' ? '-' : '+'}${Math.abs(tx.amount).toFixed(2)}
+                          {tx.type === 'expense' ? '-' : '+'}${formatCurrency(Math.abs(tx.amount))}
                         </PrivacyMask>
                       </TableCell>
                       <TableCell>
@@ -201,7 +201,7 @@ export default function DashboardPage() {
                             "w-1.5 h-1.5 rounded-full",
                             tx.status === 'Completed' ? "bg-emerald-400" : "bg-amber-400"
                           )} />
-                          <span className="text-xs">{tx.status}</span>
+                          <span className="text-[10px] uppercase font-bold">{tx.status}</span>
                         </div>
                       </TableCell>
                     </TableRow>
