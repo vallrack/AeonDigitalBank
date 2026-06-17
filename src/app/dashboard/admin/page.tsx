@@ -104,28 +104,19 @@ export default function AdminUsersPage() {
         createdAt: serverTimestamp()
       };
 
-      setDoc(userDocRef, userProfile)
-        .then(() => {
-          addDoc(collection(db, "users", newUserId, "transactions"), {
-            userId: newUserId,
-            merchant: "Aeon Welcome Bonus",
-            amount: Number(newUserData.balance),
-            category: "Income",
-            status: "Completed",
-            date: new Date().toISOString(),
-            type: "income"
-          });
-          toast({ title: "Account created successfully" });
-        })
-        .catch(async () => {
-          const permissionError = new FirestorePermissionError({
-            path: userDocRef.path,
-            operation: 'create',
-            requestResourceData: userProfile
-          });
-          errorEmitter.emit('permission-error', permissionError);
-        });
+      await setDoc(userDocRef, userProfile);
+      
+      await addDoc(collection(db, "users", newUserId, "transactions"), {
+        userId: newUserId,
+        merchant: "Aeon Welcome Bonus",
+        amount: Number(newUserData.balance),
+        category: "Income",
+        status: "Completed",
+        date: new Date().toISOString(),
+        type: "income"
+      });
 
+      toast({ title: "Account created successfully" });
       setRegisterOpen(false);
       setNewUserData({ fullName: '', email: '', password: '', balance: 5000 });
 
@@ -151,6 +142,18 @@ export default function AdminUsersPage() {
 
     updateDoc(userRef, {
       balance: increment(amount)
+    }).then(() => {
+      addDoc(txCollectionRef, {
+        userId: selectedUser.id,
+        merchant: "Admin Manual Deposit",
+        amount: amount,
+        category: "Income",
+        status: "Completed",
+        date: new Date().toISOString(),
+        type: "income",
+        reference: "Admin deposit"
+      });
+      toast({ title: "Deposit Processed" });
     }).catch(async () => {
       const permissionError = new FirestorePermissionError({
         path: userRef.path,
@@ -158,28 +161,12 @@ export default function AdminUsersPage() {
         requestResourceData: { balance: amount }
       });
       errorEmitter.emit('permission-error', permissionError);
+    }).finally(() => {
+      setDepositOpen(false);
+      setDepositAmount('');
+      setSelectedUser(null);
+      setIsProcessing(false);
     });
-
-    addDoc(txCollectionRef, {
-      userId: selectedUser.id,
-      merchant: "Admin Manual Deposit",
-      amount: amount,
-      category: "Income",
-      status: "Completed",
-      date: new Date().toISOString(),
-      type: "income",
-      reference: "Admin deposit"
-    });
-
-    toast({ 
-      title: "Deposit Processed", 
-      description: `Adding $${amount.toLocaleString()} to ${selectedUser.fullName}.`
-    });
-    
-    setDepositOpen(false);
-    setDepositAmount('');
-    setSelectedUser(null);
-    setIsProcessing(false);
   };
 
   const handleUpdateUser = (e: React.FormEvent) => {
@@ -188,7 +175,6 @@ export default function AdminUsersPage() {
     setIsProcessing(true);
 
     const userRef = doc(db, 'users', selectedUser.id);
-    
     const originalUser = users.find(u => u.id === selectedUser.id);
     const oldBalance = Number(originalUser?.balance || 0);
     const newBalance = Number(selectedUser.balance);
@@ -196,7 +182,7 @@ export default function AdminUsersPage() {
 
     const updateData = {
       fullName: selectedUser.fullName,
-      role: selectedUser.role,
+      role: selectedUser.role || originalUser?.role || 'user',
       balance: newBalance
     };
 
@@ -223,11 +209,12 @@ export default function AdminUsersPage() {
           requestResourceData: updateData
         });
         errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setEditOpen(false);
+        setSelectedUser(null);
+        setIsProcessing(false);
       });
-
-    setEditOpen(false);
-    setSelectedUser(null);
-    setIsProcessing(false);
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -403,6 +390,20 @@ export default function AdminUsersPage() {
       </div>
 
       <Card className="glass border-white/5">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="relative w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Filter users..." 
+              className="pl-9 bg-white/5 border-none"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => window.location.reload()} className="text-muted-foreground">
+            <RefreshCw size={14} className="mr-2" /> Refresh View
+          </Button>
+        </CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center p-12"><Loader2 className="animate-spin text-primary" /></div>

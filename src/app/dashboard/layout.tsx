@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, 
   ArrowRightLeft, 
@@ -225,45 +225,53 @@ function DashboardSidebar({ userData }: { userData: any }) {
 export default function RootDashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading: userLoading } = useUser();
   const db = useFirestore();
+  const initializingRef = useRef(false);
+
   const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
   const { data: userData, loading: docLoading } = useDoc(userRef);
 
   useEffect(() => {
-    if (!userLoading && user && !docLoading && !userData) {
+    if (!userLoading && user && !docLoading && !userData && !initializingRef.current) {
       const initializeProfile = async () => {
-        // Double check if doc exists with getDoc to avoid race conditions
-        const snap = await getDoc(doc(db, "users", user.uid));
-        if (snap.exists()) return;
-
-        let isFirstUser = false;
+        initializingRef.current = true;
         try {
-          const usersSnap = await getDocs(query(collection(db, "users"), limit(1)));
-          isFirstUser = usersSnap.empty;
-        } catch (e) {
-          // Silent catch
-        }
+          // Double check if doc exists with getDoc to avoid race conditions and overwrites
+          const snap = await getDoc(doc(db, "users", user.uid));
+          if (snap.exists()) {
+            initializingRef.current = false;
+            return;
+          }
 
-        const finalRole = (isFirstUser || user.email === 'vallrack67@gmail.com') ? 'admin' : 'user';
-        
-        const profileData = {
-          uid: user.uid,
-          email: user.email,
-          fullName: user.displayName || user.email?.split('@')[0] || 'New Client',
-          balance: 5000,
-          role: finalRole,
-          createdAt: serverTimestamp(),
-          kycStatus: 'Verified'
-        };
+          let isFirstUser = false;
+          try {
+            const usersSnap = await getDocs(query(collection(db, "users"), limit(1)));
+            isFirstUser = usersSnap.empty;
+          } catch (e) {
+            // Silent catch
+          }
 
-        setDoc(doc(db, "users", user.uid), profileData)
-          .catch(async (error) => {
-            const permissionError = new FirestorePermissionError({
-              path: `users/${user.uid}`,
-              operation: 'create',
-              requestResourceData: profileData
-            });
-            errorEmitter.emit('permission-error', permissionError);
+          const finalRole = (isFirstUser || user.email === 'vallrack67@gmail.com') ? 'admin' : 'user';
+          
+          const profileData = {
+            uid: user.uid,
+            email: user.email,
+            fullName: user.displayName || user.email?.split('@')[0] || 'New Client',
+            balance: 5000,
+            role: finalRole,
+            createdAt: serverTimestamp(),
+            kycStatus: 'Verified'
+          };
+
+          await setDoc(doc(db, "users", user.uid), profileData);
+        } catch (error: any) {
+          const permissionError = new FirestorePermissionError({
+            path: `users/${user.uid}`,
+            operation: 'create',
           });
+          errorEmitter.emit('permission-error', permissionError);
+        } finally {
+          initializingRef.current = false;
+        }
       };
       initializeProfile();
     }
