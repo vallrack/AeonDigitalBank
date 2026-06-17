@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useMemo, useState } from 'react';
@@ -8,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Filter, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, ArrowDownRight, Loader2, CreditCard } from 'lucide-react';
 import { PrivacyMask } from '@/components/incognito-context';
 import { cn } from '@/lib/utils';
 
@@ -29,28 +30,29 @@ export default function ActivityPage() {
 
   const filteredTransactions = transactions.filter(tx => 
     tx.merchant?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tx.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    tx.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    tx.reference?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Transaction Activity</h1>
-          <p className="text-muted-foreground">Full history of your financial movements.</p>
+          <h1 className="text-3xl font-headline font-bold">Historial de Actividad</h1>
+          <p className="text-muted-foreground">Registro detallado de tus movimientos internos en AEON.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="glass border-primary/5">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Total Volume</CardDescription>
+            <CardDescription className="text-[10px] uppercase tracking-wider font-bold">Volumen Total</CardDescription>
             <CardTitle className="text-2xl font-headline">${transactions.reduce((acc, tx) => acc + (tx.amount || 0), 0).toLocaleString()}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="glass border-primary/5">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Transactions</CardDescription>
+            <CardDescription className="text-[10px] uppercase tracking-wider font-bold">Transacciones</CardDescription>
             <CardTitle className="text-2xl font-headline">{transactions.length}</CardTitle>
           </CardHeader>
         </Card>
@@ -62,7 +64,7 @@ export default function ActivityPage() {
             <div className="relative w-full md:w-96">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Search by merchant or category..." 
+                placeholder="Buscar por concepto, receptor o categoría..." 
                 className="pl-10 bg-muted/30 border-none"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -70,7 +72,7 @@ export default function ActivityPage() {
             </div>
             <Button variant="outline" size="sm" className="gap-2">
               <Filter size={14} />
-              Filters
+              Filtros Avanzados
             </Button>
           </div>
         </CardHeader>
@@ -79,44 +81,52 @@ export default function ActivityPage() {
             <div className="flex justify-center p-20"><Loader2 className="animate-spin text-primary h-10 w-10" /></div>
           ) : filteredTransactions.length === 0 ? (
             <div className="text-center p-20 text-muted-foreground">
-              No transactions found matching your criteria.
+              No se han encontrado transacciones con esos criterios.
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="border-border/50 hover:bg-transparent">
-                  <TableHead className="w-[150px]">Date</TableHead>
-                  <TableHead>Merchant / Recipient</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[150px] text-[10px] uppercase font-bold">Fecha / Hora</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold">Entidad / Destinatario</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold">Categoría IA</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold">Referencia</TableHead>
+                  <TableHead className="text-right text-[10px] uppercase font-bold">Monto</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold">Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredTransactions.map((tx) => (
                   <TableRow key={tx.id} className="border-border/30 hover:bg-muted/30">
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(tx.date).toLocaleDateString()} {new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <TableCell className="text-[10px] text-muted-foreground">
+                      <div className="flex flex-col">
+                        <span>{new Date(tx.date).toLocaleDateString()}</span>
+                        <span className="opacity-50">{new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         <div className={cn(
-                          "w-8 h-8 rounded-full flex items-center justify-center",
+                          "w-8 h-8 rounded-lg flex items-center justify-center",
                           tx.type === 'expense' ? "bg-rose-500/10 text-rose-500" : "bg-emerald-500/10 text-emerald-500"
                         )}>
                           {tx.type === 'expense' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
                         </div>
-                        {tx.merchant}
+                        <div className="flex flex-col">
+                          <span className="text-sm">{tx.merchant}</span>
+                          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            <CreditCard size={10} /> Red AEON
+                          </span>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="font-normal">
+                      <Badge variant="secondary" className="font-normal text-[10px] py-0">
                         {tx.category}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
-                      {tx.reference || '-'}
+                    <TableCell className="text-[10px] text-muted-foreground max-w-[180px] truncate italic">
+                      {tx.reference || 'Sin concepto'}
                     </TableCell>
                     <TableCell className={cn(
                       "text-right font-headline font-semibold",
@@ -132,7 +142,7 @@ export default function ActivityPage() {
                           "w-1.5 h-1.5 rounded-full",
                           tx.status === 'Completed' ? "bg-emerald-400" : "bg-amber-400"
                         )} />
-                        <span className="text-xs">{tx.status}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-tighter">{tx.status}</span>
                       </div>
                     </TableCell>
                   </TableRow>

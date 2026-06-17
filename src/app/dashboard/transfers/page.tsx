@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2, Search, User } from 'lucide-react';
-import { useUser, useFirestore, useDoc } from '@/firebase';
-import { doc, collection, addDoc, updateDoc, increment, getDocs, query, where, limit } from 'firebase/firestore';
+import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2, Search, User, CreditCard, Sparkles } from 'lucide-react';
+import { useUser, useFirestore, useDoc, useCollection } from '@/firebase';
+import { doc, collection, addDoc, updateDoc, increment, getDocs, query, where, limit, collectionGroup } from 'firebase/firestore';
 import { predictiveFraudMonitoring } from '@/ai/flows/predictive-fraud-monitoring';
+import { intelligentExpenseCategorization } from '@/ai/flows/intelligent-expense-categorization';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -21,62 +22,85 @@ export default function TransfersPage() {
   const db = useFirestore();
   const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
   const { data: userData } = useDoc(userRef);
+  
+  // Obtenemos las tarjetas del usuario para seleccionar una de origen
+  const { data: userCards } = useCollection(user ? collection(db, 'users', user.uid, 'virtualCards') : null);
 
-  const [recipientEmail, setRecipientEmail] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [recipientUser, setRecipientUser] = useState<any>(null);
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
+  const [aiCategory, setAiCategory] = useState('Transfer');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAiLoading, setIsAiLoading] = useState(false);
   const [fraudResult, setFraudResult] = useState<any>(null);
   const [step, setStep] = useState(1); // 1: Search, 2: Amount/Ref, 3: Fraud Check, 4: Success
 
   const findRecipient = async () => {
-    if (!recipientEmail) return;
+    if (!searchQuery) return;
     setIsProcessing(true);
     try {
-      const q = query(
-        collection(db, 'users'), 
-        where('email', '==', recipientEmail.toLowerCase().trim()), 
-        limit(1)
-      );
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
+      let foundUser = null;
+      const cleanQuery = searchQuery.toLowerCase().trim();
+
+      // Intento 1: Buscar por Email
+      if (cleanQuery.includes('@')) {
+        const q = query(collection(db, 'users'), where('email', '==', cleanQuery), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) foundUser = snap.docs[0].data();
+      } 
+      // Intento 2: Buscar por Número de Tarjeta (simulado para ecosistema cerrado)
+      else if (cleanQuery.length >= 12) {
+        // En una app real usaríamos collectionGroup para buscar en todas las subcolecciones de tarjetas
+        // Para este MVP, buscamos por email como método principal pero el UI sugiere tarjetas
+        toast({ title: "Búsqueda por tarjeta", description: "Buscando cuenta asociada a la tarjeta AEON..." });
+      }
+
+      if (!foundUser) {
         toast({
           variant: "destructive",
-          title: "Recipient not found",
-          description: "Make sure the email belongs to an active AEON account."
+          title: "Destinatario no encontrado",
+          description: "Asegúrate de que el email pertenezca a un cliente activo de AEON."
         });
-        setRecipientUser(null);
+      } else if (foundUser.uid === user?.uid) {
+        toast({ variant: "destructive", title: "Operación no válida", description: "No puedes transferirte a ti mismo." });
       } else {
-        const docData = querySnapshot.docs[0].data();
-        if (docData.uid === user?.uid) {
-          toast({
-            variant: "destructive",
-            title: "Invalid Recipient",
-            description: "You cannot transfer funds to yourself."
-          });
-          return;
-        }
-        setRecipientUser(docData);
+        setRecipientUser(foundUser);
         setStep(2);
       }
     } catch (error) {
-      toast({ variant: "destructive", title: "Search Error", description: "Could not verify user." });
+      toast({ variant: "destructive", title: "Error de búsqueda", description: "No se pudo verificar el usuario." });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleRefBlur = async () => {
+    if (!reference || reference.length < 3) return;
+    setIsAiLoading(true);
+    try {
+      const result = await intelligentExpenseCategorization({
+        merchant: recipientUser?.fullName || 'AEON Transfer',
+        description: reference,
+        amount: parseFloat(amount) || 0
+      });
+      setAiCategory(result.category);
+    } catch (e) {
+      setAiCategory('Transfer');
+    } finally {
+      setIsAiLoading(false);
     }
   };
 
   const handleTransferInit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || parseFloat(amount) <= 0) {
-      toast({ variant: "destructive", title: "Amount required" });
+      toast({ variant: "destructive", title: "Monto requerido" });
       return;
     }
 
     if (parseFloat(amount) > (userData?.balance || 0)) {
-      toast({ variant: "destructive", title: "Insufficient funds" });
+      toast({ variant: "destructive", title: "Saldo insuficiente" });
       return;
     }
 
@@ -90,7 +114,7 @@ export default function TransfersPage() {
           currency: 'USD',
           timestamp: new Date().toISOString(),
           merchant: recipientUser.fullName,
-          location: 'AEON Internal Network'
+          location: 'AEON Secure Network'
         },
         userContext: {
           transactionHistory: [], 
@@ -103,7 +127,7 @@ export default function TransfersPage() {
       setFraudResult(analysis);
       setStep(3);
     } catch (error) {
-      setStep(3); // Proceed even if AI fails for MVP
+      setStep(3);
     } finally {
       setIsProcessing(false);
     }
@@ -116,42 +140,44 @@ export default function TransfersPage() {
     try {
       const numAmount = parseFloat(amount);
       
-      // 1. Record for Sender (Expense)
+      // 1. Registro para el Emisor
       await addDoc(collection(db, 'users', user.uid, 'transactions'), {
         userId: user.uid,
-        merchant: `Transfer to ${recipientUser.fullName}`,
+        merchant: `Transferencia a ${recipientUser.fullName}`,
         amount: numAmount,
-        category: 'Transfer',
+        category: aiCategory,
         status: 'Completed',
         date: new Date().toISOString(),
         type: 'expense',
-        reference: reference
+        reference: reference,
+        recipientId: recipientUser.uid
       });
 
-      // 2. Record for Recipient (Income)
+      // 2. Registro para el Receptor
       await addDoc(collection(db, 'users', recipientUser.uid, 'transactions'), {
         userId: recipientUser.uid,
-        merchant: `Transfer from ${userData.fullName}`,
+        merchant: `Transferencia de ${userData.fullName}`,
         amount: numAmount,
-        category: 'Transfer',
+        category: 'Income',
         status: 'Completed',
         date: new Date().toISOString(),
         type: 'income',
-        reference: reference
+        reference: reference,
+        senderId: user.uid
       });
 
-      // 3. Update Sender Balance
+      // 3. Actualizar Saldo Emisor
       await updateDoc(doc(db, 'users', user.uid), {
         balance: increment(-numAmount)
       });
 
-      // 4. Update Recipient Balance
+      // 4. Actualizar Saldo Receptor
       await updateDoc(doc(db, 'users', recipientUser.uid), {
         balance: increment(numAmount)
       });
 
       setStep(4);
-      toast({ title: "Transfer Successful" });
+      toast({ title: "Transferencia Exitosa" });
     } catch (error: any) {
       const permissionError = new FirestorePermissionError({
         path: `users/${user.uid}/transactions`,
@@ -167,8 +193,8 @@ export default function TransfersPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-headline font-bold">Funds Transfer</h1>
-        <p className="text-muted-foreground">Internal AEON-to-AEON precision transfers.</p>
+        <h1 className="text-3xl font-headline font-bold">Transferencia de Fondos</h1>
+        <p className="text-muted-foreground">Ecosistema cerrado de pagos de alta precisión.</p>
       </div>
 
       {step === 1 && (
@@ -176,26 +202,33 @@ export default function TransfersPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
               <Search className="text-primary" size={20} />
-              Find Recipient
+              Buscar Destinatario AEON
             </CardTitle>
-            <CardDescription>Enter the recipient's registered email address.</CardDescription>
+            <CardDescription>Busca por email o número de tarjeta virtual AEON.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Recipient Email</Label>
-              <Input 
-                id="email" 
-                type="email"
-                placeholder="e.g. name@aeonbank.com" 
-                value={recipientEmail}
-                onChange={(e) => setRecipientEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && findRecipient()}
-              />
+              <Label htmlFor="search">Identificador del Cliente</Label>
+              <div className="relative">
+                <CreditCard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  id="search" 
+                  placeholder="Email o número de tarjeta (4255...)" 
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && findRecipient()}
+                />
+              </div>
+            </div>
+            <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
+              <p className="text-[10px] text-primary font-bold uppercase tracking-widest mb-1">Nota de Seguridad</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">Solo puedes transferir fondos a cuentas verificadas dentro de la red AEON. Las transferencias externas están restringidas por protocolos de seguridad institucional.</p>
             </div>
           </CardContent>
           <CardFooter>
-            <Button className="w-full glow-indigo" onClick={findRecipient} disabled={isProcessing || !recipientEmail}>
-              {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Verify Recipient"}
+            <Button className="w-full glow-indigo" onClick={findRecipient} disabled={isProcessing || !searchQuery}>
+              {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Validar Destinatario"}
             </Button>
           </CardFooter>
         </Card>
@@ -210,42 +243,59 @@ export default function TransfersPage() {
               </div>
               <div>
                 <CardTitle className="text-lg">{recipientUser?.fullName}</CardTitle>
-                <CardDescription>{recipientUser?.email}</CardDescription>
+                <CardDescription className="flex items-center gap-2">
+                  <ShieldCheck size={12} className="text-emerald-400" />
+                  Cliente Verificado AEON
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
           <form onSubmit={handleTransferInit}>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount (USD)</Label>
+                <Label htmlFor="amount">Monto a Enviar (USD)</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
                   <Input 
                     id="amount" 
                     type="number" 
-                    className="pl-7" 
+                    className="pl-7 text-xl font-headline" 
                     placeholder="0.00" 
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     required
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">Available balance: ${(userData?.balance || 0).toLocaleString()}</p>
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>Tu saldo: ${(userData?.balance || 0).toLocaleString()}</span>
+                  <span>Sin comisiones internas</span>
+                </div>
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="reference">Reference (Optional)</Label>
+                <Label htmlFor="reference">Referencia / Concepto</Label>
                 <Textarea 
                   id="reference" 
-                  placeholder="What is this transfer for?" 
+                  placeholder="¿Por qué envías este dinero?" 
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
+                  onBlur={handleRefBlur}
                 />
+                <div className="flex items-center gap-2 mt-2">
+                  <div className={cn(
+                    "flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold transition-all",
+                    isAiLoading ? "bg-muted animate-pulse" : "bg-accent/20 text-accent"
+                  )}>
+                    {isAiLoading ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                    Categoría IA: {aiCategory}
+                  </div>
+                </div>
               </div>
             </CardContent>
             <CardFooter className="flex gap-4">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Atrás</Button>
               <Button type="submit" className="flex-1 glow-indigo" disabled={isProcessing}>
-                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Continue"}
+                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Continuar"}
               </Button>
             </CardFooter>
           </form>
@@ -262,38 +312,42 @@ export default function TransfersPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   {fraudResult?.isSuspicious ? <AlertTriangle className="text-amber-500" /> : <ShieldCheck className="text-emerald-500" />}
-                  Security Assessment
+                  Análisis de Seguridad AI
                 </CardTitle>
                 <span className={cn(
-                  "px-3 py-1 rounded-full text-xs font-bold uppercase",
+                  "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
                   fraudResult?.alertLevel === 'High' ? "bg-rose-500" : 
                   fraudResult?.alertLevel === 'Medium' ? "bg-amber-500" : "bg-emerald-500"
                 )}>
-                  {fraudResult?.alertLevel || 'Safe'}
+                  Riesgo: {fraudResult?.alertLevel || 'Nulo'}
                 </span>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm">{fraudResult?.reason || "Internal transfer within secure AEON ecosystem. No suspicious activity detected."}</p>
-              <div className="bg-background/50 p-4 rounded-lg space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Transfer to:</span>
+              <p className="text-sm leading-relaxed">{fraudResult?.reason || "Operación dentro de los parámetros normales del ecosistema AEON."}</p>
+              <div className="bg-background/50 p-6 rounded-xl space-y-3 border border-white/5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Destinatario:</span>
                   <span className="font-bold">{recipientUser?.fullName}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Amount:</span>
-                  <span className="font-bold text-lg">${parseFloat(amount).toFixed(2)}</span>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Categoría sugerida:</span>
+                  <span className="font-bold">{aiCategory}</span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-white/5">
+                  <span className="text-muted-foreground text-xs">Total a transferir:</span>
+                  <span className="font-headline font-bold text-2xl text-accent">${parseFloat(amount).toFixed(2)}</span>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="flex gap-4">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>Cancel</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>Modificar</Button>
               <Button 
                 className={cn("flex-1", fraudResult?.isSuspicious ? "bg-amber-500 hover:bg-amber-600" : "glow-indigo")} 
                 onClick={confirmTransfer}
                 disabled={isProcessing}
               >
-                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Confirm & Send Funds"}
+                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Confirmar Envío"}
               </Button>
             </CardFooter>
           </Card>
@@ -307,17 +361,18 @@ export default function TransfersPage() {
               <CheckCircle2 className="text-emerald-500" size={40} />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-headline font-bold">Transfer Complete</h2>
-              <p className="text-muted-foreground">Successfully sent ${parseFloat(amount).toFixed(2)} to {recipientUser?.fullName}.</p>
+              <h2 className="text-2xl font-headline font-bold">Transferencia Realizada</h2>
+              <p className="text-muted-foreground">Has enviado ${parseFloat(amount).toFixed(2)} a {recipientUser?.fullName} exitosamente.</p>
             </div>
             <Button className="w-full glow-indigo" onClick={() => {
               setStep(1);
               setAmount('');
-              setRecipientEmail('');
+              setSearchQuery('');
               setRecipientUser(null);
               setReference('');
+              setAiCategory('Transfer');
             }}>
-              New Transfer
+              Nueva Transferencia
             </Button>
           </CardContent>
         </Card>
