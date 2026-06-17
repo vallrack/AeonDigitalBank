@@ -15,7 +15,8 @@ import {
   EyeOff,
   Search,
   Users,
-  ShieldAlert
+  ShieldAlert,
+  Languages
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -36,6 +37,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { IncognitoProvider, useIncognito } from '@/components/incognito-context';
+import { useI18n } from '@/lib/i18n/context';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth, useUser, useDoc, useFirestore } from '@/firebase';
@@ -43,10 +45,17 @@ import { signOut } from 'firebase/auth';
 import { doc, getDocs, collection, query, limit, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 function TopNav({ userData }: { userData: any }) {
   const { isIncognito, toggleIncognito } = useIncognito();
   const { user } = useUser();
+  const { language, setLanguage, t } = useI18n();
   
   return (
     <header className="h-16 border-b flex items-center justify-between px-6 bg-background/50 backdrop-blur-md sticky top-0 z-40">
@@ -55,7 +64,7 @@ function TopNav({ userData }: { userData: any }) {
         <div className="hidden md:flex relative w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search AEON..." 
+            placeholder={t.common.search + " AEON..."} 
             className="pl-9 bg-muted/50 border-none focus-visible:ring-1"
           />
         </div>
@@ -65,9 +74,26 @@ function TopNav({ userData }: { userData: any }) {
         {userData?.role === 'admin' && (
           <div className="flex items-center gap-1.5 px-3 py-1 bg-accent/20 border border-accent/30 rounded-full text-[10px] font-bold text-accent uppercase tracking-wider animate-pulse">
             <ShieldAlert size={12} />
-            Admin Mode
+            {t.common.admin_mode}
           </div>
         )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="text-muted-foreground">
+              <Languages size={20} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="glass border-white/10">
+            <DropdownMenuItem onClick={() => setLanguage('es')} className={language === 'es' ? 'bg-primary/20' : ''}>
+              Español 🇪🇸
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage('en')} className={language === 'en' ? 'bg-primary/20' : ''}>
+              English 🇺🇸
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <Button 
           variant="ghost" 
           size="icon" 
@@ -93,26 +119,25 @@ function DashboardSidebar({ userData }: { userData: any }) {
   const pathname = usePathname();
   const auth = useAuth();
   const router = useRouter();
+  const { t } = useI18n();
 
   const handleSignOut = async () => {
     try {
       await signOut(auth);
       router.push('/login');
-    } catch (error) {
-      // Error handled by Firebase error listener
-    }
+    } catch (error) {}
   };
 
   const menuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-    { icon: ArrowRightLeft, label: 'Transfers', href: '/dashboard/transfers' },
-    { icon: CreditCard, label: 'Virtual Cards', href: '/dashboard/cards' },
-    { icon: History, label: 'Activity', href: '/dashboard/activity' },
+    { icon: LayoutDashboard, label: t.nav.dashboard, href: '/dashboard' },
+    { icon: ArrowRightLeft, label: t.nav.transfers, href: '/dashboard/transfers' },
+    { icon: CreditCard, label: t.nav.cards, href: '/dashboard/cards' },
+    { icon: History, label: t.nav.activity, href: '/dashboard/activity' },
   ];
 
   const secondaryItems = [
-    { icon: ShieldCheck, label: 'Security', href: '/dashboard/security' },
-    { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
+    { icon: ShieldCheck, label: t.nav.security, href: '/dashboard/security' },
+    { icon: Settings, label: t.nav.settings, href: '/dashboard/settings' },
   ];
 
   const isAdmin = userData?.role === 'admin';
@@ -165,12 +190,12 @@ function DashboardSidebar({ userData }: { userData: any }) {
                   <SidebarMenuButton 
                     asChild 
                     isActive={pathname === '/dashboard/admin'}
-                    tooltip="User Management"
+                    tooltip={t.nav.manage_clients}
                     className={pathname === '/dashboard/admin' ? "bg-accent/10 text-accent font-bold" : "text-accent/80 hover:bg-accent/5"}
                   >
                     <Link href="/dashboard/admin">
                       <Users />
-                      <span>Manage Clients</span>
+                      <span>{t.nav.manage_clients}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -213,7 +238,7 @@ function DashboardSidebar({ userData }: { userData: any }) {
               className="text-destructive hover:bg-destructive/10"
             >
               <LogOut />
-              <span>Sign Out</span>
+              <span>{t.nav.sign_out}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -235,7 +260,6 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
       const initializeProfile = async () => {
         initializingRef.current = true;
         try {
-          // Double check if doc exists with getDoc to avoid race conditions and overwrites
           const snap = await getDoc(doc(db, "users", user.uid));
           if (snap.exists()) {
             initializingRef.current = false;
@@ -246,9 +270,7 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
           try {
             const usersSnap = await getDocs(query(collection(db, "users"), limit(1)));
             isFirstUser = usersSnap.empty;
-          } catch (e) {
-            // Silent catch
-          }
+          } catch (e) {}
 
           const finalRole = (isFirstUser || user.email === 'vallrack67@gmail.com') ? 'admin' : 'user';
           

@@ -4,6 +4,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PrivacyMask } from '@/components/incognito-context';
+import { useI18n } from '@/lib/i18n/context';
 import { TrendingUp, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface BalanceWidgetProps {
@@ -17,16 +18,16 @@ export function BalanceWidget({
   income = 0, 
   expenses = 0 
 }: BalanceWidgetProps) {
-  // Formateador de moneda consistente (Formato: $5.000,00)
+  const { t } = useI18n();
+
   const formatCurrency = (val: any) => {
     const num = Number(val) || 0;
-    return num.toLocaleString('es-ES', {
+    return num.toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
   };
 
-  // Determinar tamaño de fuente basado en la longitud del número para evitar overflow
   const balanceString = formatCurrency(balance);
   const fontSize = balanceString.length > 12 ? "text-2xl" : balanceString.length > 9 ? "text-3xl" : "text-4xl";
 
@@ -36,7 +37,7 @@ export function BalanceWidget({
       <CardHeader className="pb-2">
         <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2 uppercase tracking-tighter">
           <Wallet size={14} className="text-primary" />
-          Balance Total Disponible
+          {t.dashboard.total_balance}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col justify-between">
@@ -50,10 +51,10 @@ export function BalanceWidget({
           <div className="flex items-center gap-2 text-[10px]">
             <span className="text-emerald-400 flex items-center gap-0.5 font-bold uppercase tracking-widest">
               <TrendingUp size={10} />
-              En Vivo
+              Live
             </span>
             <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-            <span className="text-muted-foreground font-medium">Red AEON Digital</span>
+            <span className="text-muted-foreground font-medium">AEON Digital Network</span>
           </div>
         </div>
 
@@ -61,7 +62,7 @@ export function BalanceWidget({
           <div className="flex flex-col gap-1">
             <div className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest flex items-center gap-1 mb-1">
               <ArrowDownRight size={10} className="text-emerald-400" />
-              Ingresos
+              {t.dashboard.income}
             </div>
             <div className="text-sm font-headline font-bold text-emerald-400 truncate">
               <PrivacyMask>${formatCurrency(income)}</PrivacyMask>
@@ -70,7 +71,7 @@ export function BalanceWidget({
           <div className="flex flex-col gap-1 border-l border-white/5 pl-4">
             <div className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest flex items-center gap-1 mb-1">
               <ArrowUpRight size={10} className="text-rose-400" />
-              Gastos
+              {t.dashboard.expenses}
             </div>
             <div className="text-sm font-headline font-bold text-rose-400 truncate">
               <PrivacyMask>${formatCurrency(expenses)}</PrivacyMask>
