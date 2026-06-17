@@ -25,6 +25,9 @@ export const translations = {
       settings: "Ajustes",
       manage_clients: "Gestionar Clientes",
       sign_out: "Cerrar Sesión",
+      banking: "Banca",
+      support: "Soporte",
+      administration: "Administración",
     },
     dashboard: {
       status: "Estado actual de tus cuentas en la Red AEON.",
@@ -101,6 +104,9 @@ export const translations = {
       settings: "Settings",
       manage_clients: "Manage Clients",
       sign_out: "Sign Out",
+      banking: "Banking",
+      support: "Support",
+      administration: "Administration",
     },
     dashboard: {
       status: "Current state of your accounts in the AEON Network.",

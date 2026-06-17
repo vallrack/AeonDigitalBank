@@ -1,5 +1,5 @@
 
-"use client"
+'use client';
 
 import React, { useMemo, useEffect, useRef } from 'react';
 import { 
@@ -16,7 +16,8 @@ import {
   Search,
   Users,
   ShieldAlert,
-  Languages
+  Languages,
+  PanelLeft
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -31,7 +32,8 @@ import {
   SidebarInset,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarGroupContent
+  SidebarGroupContent,
+  useSidebar
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -56,11 +58,19 @@ function TopNav({ userData }: { userData: any }) {
   const { isIncognito, toggleIncognito } = useIncognito();
   const { user } = useUser();
   const { language, setLanguage, t } = useI18n();
+  const { toggleSidebar } = useSidebar();
   
   return (
     <header className="h-16 border-b flex items-center justify-between px-6 bg-background/50 backdrop-blur-md sticky top-0 z-40">
       <div className="flex items-center gap-4">
-        <SidebarTrigger />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={toggleSidebar}
+          className="md:flex"
+        >
+          <PanelLeft size={20} />
+        </Button>
         <div className="hidden md:flex relative w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input 
@@ -143,20 +153,20 @@ function DashboardSidebar({ userData }: { userData: any }) {
   const isAdmin = userData?.role === 'admin';
 
   return (
-    <Sidebar className="border-r border-border/50">
+    <Sidebar collapsible="icon" className="border-r border-border/50">
       <SidebarHeader className="h-16 flex items-center px-4">
         <Link href="/dashboard" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
             <span className="text-primary-foreground font-headline font-bold">A</span>
           </div>
-          <span className="font-headline font-bold text-lg tracking-tight">
+          <span className="font-headline font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">
             AEON <span className="text-accent">BANK</span>
           </span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Banking</SidebarGroupLabel>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">{t.nav.banking}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {
@@ -183,7 +193,7 @@ function DashboardSidebar({ userData }: { userData: any }) {
 
         {isAdmin && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-accent font-bold">Administration</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-accent font-bold group-data-[collapsible=icon]:hidden">{t.nav.administration}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -205,7 +215,7 @@ function DashboardSidebar({ userData }: { userData: any }) {
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel>Support</SidebarGroupLabel>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">{t.nav.support}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {secondaryItems.map((item) => {
@@ -236,6 +246,7 @@ function DashboardSidebar({ userData }: { userData: any }) {
             <SidebarMenuButton 
               onClick={handleSignOut}
               className="text-destructive hover:bg-destructive/10"
+              tooltip={t.nav.sign_out}
             >
               <LogOut />
               <span>{t.nav.sign_out}</span>
