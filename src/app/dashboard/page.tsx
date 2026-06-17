@@ -42,6 +42,7 @@ export default function DashboardPage() {
 
   const recentTransactions = allTransactions.slice(0, 5);
 
+  // Cálculo del balance real basado en el ledger (historial) para máxima precisión
   const totals = useMemo(() => {
     return allTransactions.reduce((acc, tx) => {
       const amount = Number(tx.amount || 0);
@@ -50,6 +51,10 @@ export default function DashboardPage() {
       return acc;
     }, { income: 0, expenses: 0 });
   }, [allTransactions]);
+
+  const realBalance = useMemo(() => {
+    return totals.income - totals.expenses;
+  }, [totals]);
 
   const activityData = useMemo(() => {
     const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -105,7 +110,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <BalanceWidget 
-          balance={Number(userData?.balance) || 0} 
+          balance={realBalance} 
           income={totals.income}
           expenses={totals.expenses}
         />

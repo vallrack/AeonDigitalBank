@@ -104,12 +104,11 @@ export default function AdminUsersPage() {
         createdAt: serverTimestamp()
       };
 
-      // Mutación no bloqueante
       setDoc(userDocRef, userProfile)
         .then(() => {
           addDoc(collection(db, "users", newUserId, "transactions"), {
             userId: newUserId,
-            merchant: "Admin Manual Deposit",
+            merchant: "Aeon Welcome Bonus",
             amount: Number(newUserData.balance),
             category: "Income",
             status: "Completed",
@@ -150,7 +149,7 @@ export default function AdminUsersPage() {
     const userRef = doc(db, 'users', selectedUser.id);
     const txCollectionRef = collection(db, 'users', selectedUser.id, 'transactions');
 
-    // Mutación no bloqueante para actualización instantánea en UI
+    // Actualización instantánea en UI
     updateDoc(userRef, {
       balance: increment(amount)
     }).catch(async () => {
@@ -175,7 +174,7 @@ export default function AdminUsersPage() {
 
     toast({ 
       title: "Deposit Processed", 
-      description: `Adding $${amount} to ${selectedUser.fullName}.`
+      description: `Adding $${amount.toLocaleString()} to ${selectedUser.fullName}.`
     });
     
     setDepositOpen(false);
