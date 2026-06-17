@@ -26,3 +26,4 @@ git push -u origin main
 
 - Node.js 18+
 - Una cuenta de Firebase configurada.
+# AeonDigitalBank
