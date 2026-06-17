@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2, Search, User, CreditCard, Sparkles } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useCollection } from '@/firebase';
-import { doc, collection, addDoc, updateDoc, increment, getDocs, query, where, limit, collectionGroup } from 'firebase/firestore';
+import { doc, collection, writeBatch, increment, getDocs, query, where, limit } from 'firebase/firestore';
 import { predictiveFraudMonitoring } from '@/ai/flows/predictive-fraud-monitoring';
 import { intelligentExpenseCategorization } from '@/ai/flows/intelligent-expense-categorization';
 import { toast } from '@/hooks/use-toast';
@@ -23,9 +23,6 @@ export default function TransfersPage() {
   const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
   const { data: userData } = useDoc(userRef);
   
-  // Obtenemos las tarjetas del usuario para seleccionar una de origen
-  const { data: userCards } = useCollection(user ? collection(db, 'users', user.uid, 'virtualCards') : null);
-
   const [searchQuery, setSearchQuery] = useState('');
   const [recipientUser, setRecipientUser] = useState<any>(null);
   const [amount, setAmount] = useState('');
@@ -34,7 +31,7 @@ export default function TransfersPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [fraudResult, setFraudResult] = useState<any>(null);
-  const [step, setStep] = useState(1); // 1: Search, 2: Amount/Ref, 3: Fraud Check, 4: Success
+  const [step, setStep] = useState(1);
 
   const findRecipient = async () => {
     if (!searchQuery) return;
@@ -43,18 +40,11 @@ export default function TransfersPage() {
       let foundUser = null;
       const cleanQuery = searchQuery.toLowerCase().trim();
 
-      // Intento 1: Buscar por Email
       if (cleanQuery.includes('@')) {
         const q = query(collection(db, 'users'), where('email', '==', cleanQuery), limit(1));
         const snap = await getDocs(q);
         if (!snap.empty) foundUser = snap.docs[0].data();
       } 
-      // Intento 2: Buscar por Número de Tarjeta (simulado para ecosistema cerrado)
-      else if (cleanQuery.length >= 12) {
-        // En una app real usaríamos collectionGroup para buscar en todas las subcolecciones de tarjetas
-        // Para este MVP, buscamos por email como método principal pero el UI sugiere tarjetas
-        toast({ title: "Búsqueda por tarjeta", description: "Buscando cuenta asociada a la tarjeta AEON..." });
-      }
 
       if (!foundUser) {
         toast({
@@ -133,61 +123,59 @@ export default function TransfersPage() {
     }
   };
 
-  const confirmTransfer = async () => {
+  const confirmTransfer = () => {
     if (!user || !userData || !recipientUser) return;
     setIsProcessing(true);
 
-    try {
-      const numAmount = parseFloat(amount);
-      
-      // 1. Registro para el Emisor
-      await addDoc(collection(db, 'users', user.uid, 'transactions'), {
-        userId: user.uid,
-        merchant: `Transferencia a ${recipientUser.fullName}`,
-        amount: numAmount,
-        category: aiCategory,
-        status: 'Completed',
-        date: new Date().toISOString(),
-        type: 'expense',
-        reference: reference,
-        recipientId: recipientUser.uid
-      });
+    const numAmount = parseFloat(amount);
+    const batch = writeBatch(db);
 
-      // 2. Registro para el Receptor
-      await addDoc(collection(db, 'users', recipientUser.uid, 'transactions'), {
-        userId: recipientUser.uid,
-        merchant: `Transferencia de ${userData.fullName}`,
-        amount: numAmount,
-        category: 'Income',
-        status: 'Completed',
-        date: new Date().toISOString(),
-        type: 'income',
-        reference: reference,
-        senderId: user.uid
-      });
+    const senderTxRef = doc(collection(db, 'users', user.uid, 'transactions'));
+    const recipientTxRef = doc(collection(db, 'users', recipientUser.uid, 'transactions'));
+    const senderUserRef = doc(db, 'users', user.uid);
+    const recipientUserRef = doc(db, 'users', recipientUser.uid);
 
-      // 3. Actualizar Saldo Emisor
-      await updateDoc(doc(db, 'users', user.uid), {
-        balance: increment(-numAmount)
-      });
+    batch.set(senderTxRef, {
+      userId: user.uid,
+      merchant: `Transferencia a ${recipientUser.fullName}`,
+      amount: numAmount,
+      category: aiCategory,
+      status: 'Completed',
+      date: new Date().toISOString(),
+      type: 'expense',
+      reference: reference,
+      recipientId: recipientUser.uid
+    });
 
-      // 4. Actualizar Saldo Receptor
-      await updateDoc(doc(db, 'users', recipientUser.uid), {
-        balance: increment(numAmount)
-      });
+    batch.set(recipientTxRef, {
+      userId: recipientUser.uid,
+      merchant: `Transferencia de ${userData.fullName}`,
+      amount: numAmount,
+      category: 'Income',
+      status: 'Completed',
+      date: new Date().toISOString(),
+      type: 'income',
+      reference: reference,
+      senderId: user.uid
+    });
 
-      setStep(4);
-      toast({ title: "Transferencia Exitosa" });
-    } catch (error: any) {
-      const permissionError = new FirestorePermissionError({
-        path: `users/${user.uid}/transactions`,
-        operation: 'create',
-        requestResourceData: { amount }
-      });
-      errorEmitter.emit('permission-error', permissionError);
-    } finally {
-      setIsProcessing(false);
-    }
+    batch.update(senderUserRef, { balance: increment(-numAmount) });
+    batch.update(recipientUserRef, { balance: increment(numAmount) });
+
+    batch.commit()
+      .then(() => {
+        setStep(4);
+        toast({ title: "Transferencia Exitosa" });
+      })
+      .catch(async () => {
+        const permissionError = new FirestorePermissionError({
+          path: `users/${user.uid}/transactions`,
+          operation: 'write',
+          requestResourceData: { amount: numAmount }
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => setIsProcessing(false));
   };
 
   return (
@@ -204,16 +192,16 @@ export default function TransfersPage() {
               <Search className="text-primary" size={20} />
               Buscar Destinatario AEON
             </CardTitle>
-            <CardDescription>Busca por email o número de tarjeta virtual AEON.</CardDescription>
+            <CardDescription>Busca por email verificado en la red AEON.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="search">Identificador del Cliente</Label>
               <div className="relative">
-                <CreditCard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input 
                   id="search" 
-                  placeholder="Email o número de tarjeta (4255...)" 
+                  placeholder="Introduce el email del destinatario" 
                   className="pl-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -223,7 +211,7 @@ export default function TransfersPage() {
             </div>
             <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
               <p className="text-[10px] text-primary font-bold uppercase tracking-widest mb-1">Nota de Seguridad</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">Solo puedes transferir fondos a cuentas verificadas dentro de la red AEON. Las transferencias externas están restringidas por protocolos de seguridad institucional.</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">Las transferencias entre cuentas AEON son instantáneas y gratuitas.</p>
             </div>
           </CardContent>
           <CardFooter>
@@ -329,10 +317,6 @@ export default function TransfersPage() {
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Destinatario:</span>
                   <span className="font-bold">{recipientUser?.fullName}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Categoría sugerida:</span>
-                  <span className="font-bold">{aiCategory}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-white/5">
                   <span className="text-muted-foreground text-xs">Total a transferir:</span>

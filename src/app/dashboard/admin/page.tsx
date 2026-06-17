@@ -1,8 +1,9 @@
+
 "use client"
 
 import React, { useMemo, useState } from 'react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, doc, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -57,7 +58,6 @@ export default function AdminUsersPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
-  // Form state for new user
   const [newUserData, setNewUserData] = useState({
     fullName: '',
     email: '',
@@ -92,7 +92,8 @@ export default function AdminUsersPage() {
       
       const newUserId = userCredential.user.uid;
 
-      await setDoc(doc(db, "users", newUserId), {
+      const userDocRef = doc(db, "users", newUserId);
+      const userProfile = {
         uid: newUserId,
         email: newUserData.email,
         fullName: newUserData.fullName,
@@ -100,37 +101,44 @@ export default function AdminUsersPage() {
         role: "user",
         kycStatus: 'Verified',
         createdAt: serverTimestamp()
-      });
+      };
 
-      await addDoc(collection(db, "users", newUserId, "transactions"), {
-        userId: newUserId,
-        merchant: "Admin Manual Deposit",
-        amount: Number(newUserData.balance),
-        category: "Income",
-        status: "Completed",
-        date: new Date().toISOString(),
-        type: "income"
-      });
+      setDoc(userDocRef, userProfile)
+        .then(() => {
+          addDoc(collection(db, "users", newUserId, "transactions"), {
+            userId: newUserId,
+            merchant: "Admin Manual Deposit",
+            amount: Number(newUserData.balance),
+            category: "Income",
+            status: "Completed",
+            date: new Date().toISOString(),
+            type: "income"
+          });
+          toast({ title: "Client Created Successfully" });
+          setRegisterOpen(false);
+          setNewUserData({ fullName: '', email: '', password: '', balance: 5000 });
+        })
+        .catch(async () => {
+          const permissionError = new FirestorePermissionError({
+            path: userDocRef.path,
+            operation: 'create',
+            requestResourceData: userProfile
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        });
 
-      toast({
-        title: "Client Created Successfully",
-        description: `User ${newUserData.fullName} has been added to Aeon Bank.`,
-      });
-
-      setRegisterOpen(false);
-      setNewUserData({ fullName: '', email: '', password: '', balance: 5000 });
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Registration Error",
-        description: error.message || "Could not create the client profile.",
+        description: error.message,
       });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleUpdateUser = async (e: React.FormEvent) => {
+  const handleUpdateUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
     setIsProcessing(true);
@@ -159,12 +167,12 @@ export default function AdminUsersPage() {
   };
 
   const handleDeleteUser = (userId: string) => {
-    if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
+    if (!confirm("¿Estás seguro de eliminar este usuario?")) return;
     
     const userRef = doc(db, 'users', userId);
     deleteDoc(userRef)
       .then(() => {
-        toast({ title: "User deleted" });
+        toast({ title: "Usuario eliminado" });
       })
       .catch(async () => {
         const permissionError = new FirestorePermissionError({
@@ -173,11 +181,6 @@ export default function AdminUsersPage() {
         });
         errorEmitter.emit('permission-error', permissionError);
       });
-  };
-
-  const openEditDialog = (user: any) => {
-    setSelectedUser({ ...user });
-    setEditOpen(true);
   };
 
   return (
@@ -201,53 +204,40 @@ export default function AdminUsersPage() {
           <DialogContent className="glass border-white/10 sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle className="font-headline text-xl">Register New Client</DialogTitle>
-              <DialogDescription>
-                Create a new account with an initial balance.
-              </DialogDescription>
+              <DialogDescription>Create a new account with an initial balance.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateClient}>
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
+                  <Label>Full Name</Label>
                   <Input 
-                    id="name" 
-                    placeholder="Elena Smith" 
-                    className="bg-white/5 border-white/10"
                     value={newUserData.fullName}
                     onChange={(e) => setNewUserData({...newUserData, fullName: e.target.value})}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label>Email</Label>
                   <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="elena@example.com" 
-                    className="bg-white/5 border-white/10"
+                    type="email"
                     value={newUserData.email}
                     onChange={(e) => setNewUserData({...newUserData, email: e.target.value})}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Temporary Password</Label>
+                  <Label>Password</Label>
                   <Input 
-                    id="password" 
-                    type="password" 
-                    placeholder="••••••••" 
-                    className="bg-white/5 border-white/10"
+                    type="password"
                     value={newUserData.password}
                     onChange={(e) => setNewUserData({...newUserData, password: e.target.value})}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="balance">Initial Deposit ($)</Label>
+                  <Label>Initial Deposit ($)</Label>
                   <Input 
-                    id="balance" 
-                    type="number" 
-                    className="bg-white/5 border-white/10"
+                    type="number"
                     value={newUserData.balance}
                     onChange={(e) => setNewUserData({...newUserData, balance: Number(e.target.value)})}
                     required
@@ -256,7 +246,7 @@ export default function AdminUsersPage() {
               </div>
               <DialogFooter>
                 <Button type="submit" className="w-full glow-indigo" disabled={isProcessing}>
-                  {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Create & Activate Account"}
+                  {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Create Account"}
                 </Button>
               </DialogFooter>
             </form>
@@ -264,169 +254,69 @@ export default function AdminUsersPage() {
         </Dialog>
       </div>
 
-      {/* Edit User Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="glass border-white/10 sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="font-headline text-xl">Edit Client Profile</DialogTitle>
-            <DialogDescription>
-              Modify user details, balance or role.
-            </DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Edit Client</DialogTitle></DialogHeader>
           {selectedUser && (
-            <form onSubmit={handleUpdateUser}>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>Full Name</Label>
-                  <Input 
-                    value={selectedUser.fullName}
-                    onChange={(e) => setSelectedUser({...selectedUser, fullName: e.target.value})}
-                    className="bg-white/5 border-white/10"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Current Balance ($)</Label>
-                  <Input 
-                    type="number"
-                    value={selectedUser.balance}
-                    onChange={(e) => setSelectedUser({...selectedUser, balance: e.target.value})}
-                    className="bg-white/5 border-white/10"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Role</Label>
-                  <select 
-                    className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm ring-offset-background"
-                    value={selectedUser.role}
-                    onChange={(e) => setSelectedUser({...selectedUser, role: e.target.value})}
-                  >
-                    <option value="user" className="bg-[#0E1016]">Standard User</option>
-                    <option value="admin" className="bg-[#0E1016]">Administrator</option>
-                  </select>
-                </div>
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input value={selectedUser.fullName} onChange={e => setSelectedUser({...selectedUser, fullName: e.target.value})} />
               </div>
-              <DialogFooter>
-                <Button type="submit" className="w-full glow-indigo" disabled={isProcessing}>
-                  {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Save Changes"}
-                </Button>
-              </DialogFooter>
+              <div className="space-y-2">
+                <Label>Balance</Label>
+                <Input type="number" value={selectedUser.balance} onChange={e => setSelectedUser({...selectedUser, balance: e.target.value})} />
+              </div>
+              <DialogFooter><Button type="submit" disabled={isProcessing}>Save</Button></DialogFooter>
             </form>
           )}
         </DialogContent>
       </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="glass border-primary/5">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Total Clients</CardDescription>
-            <CardTitle className="text-2xl font-headline">{users.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="glass border-primary/5">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Active Admins</CardDescription>
-            <CardTitle className="text-2xl font-headline">{users.filter(u => u.role === 'admin').length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="glass border-primary/5">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Total Bank Reserves</CardDescription>
-            <CardTitle className="text-2xl font-headline text-accent">
-              ${users.reduce((acc, u) => acc + (u.balance || 0), 0).toLocaleString()}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+        <Card className="glass"><CardHeader><CardTitle>{users.length}</CardTitle><CardDescription>Total Clients</CardDescription></CardHeader></Card>
+        <Card className="glass"><CardHeader><CardTitle>{users.filter(u => u.role === 'admin').length}</CardTitle><CardDescription>Admins</CardDescription></CardHeader></Card>
+        <Card className="glass"><CardHeader><CardTitle>${users.reduce((acc, u) => acc + (u.balance || 0), 0).toLocaleString()}</CardTitle><CardDescription>Reserves</CardDescription></CardHeader></Card>
       </div>
 
-      <Card className="glass border-primary/5">
-        <CardHeader>
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search clients by name or email..." 
-              className="pl-10 bg-muted/30 border-none"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center p-20"><Loader2 className="animate-spin text-primary h-10 w-10" /></div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="text-center p-20 text-muted-foreground">
-              No clients found.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border/50 hover:bg-transparent text-xs uppercase tracking-wider">
-                  <TableHead>User / Role</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Joined Date</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+      <Card className="glass">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.map((u) => (
+                <TableRow key={u.uid}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8"><AvatarImage src={`https://picsum.photos/seed/${u.uid}/100/100`} /><AvatarFallback>{u.fullName?.[0]}</AvatarFallback></Avatar>
+                      <div>
+                        <div className="font-bold text-sm">{u.fullName}</div>
+                        <Badge variant="secondary" className="text-[8px] h-3">{u.role}</Badge>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{u.email}</TableCell>
+                  <TableCell className="text-right font-bold text-accent">${(u.balance || 0).toLocaleString()}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical size={14} /></Button></DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="glass">
+                        <DropdownMenuItem onClick={() => { setSelectedUser(u); setEditOpen(true); }}><Edit size={12} className="mr-2"/>Edit</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDeleteUser(u.uid)} className="text-destructive"><Trash2 size={12} className="mr-2"/>Delete</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((u) => (
-                  <TableRow key={u.uid} className="border-border/30 hover:bg-muted/30">
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9 border border-primary/20">
-                          <AvatarImage src={`https://picsum.photos/seed/${u.uid}/100/100`} />
-                          <AvatarFallback>{u.fullName?.substring(0,2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-sm">{u.fullName}</span>
-                          <Badge variant={u.role === 'admin' ? "default" : "secondary"} className="text-[10px] w-fit py-0 h-4">
-                            {u.role?.toUpperCase()}
-                          </Badge>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Mail size={14} className="opacity-50" />
-                        {u.email}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Calendar size={14} className="opacity-50" />
-                        {u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString() : 'Recent'}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-headline font-bold text-accent">
-                      <div className="flex items-center justify-end gap-1">
-                        <DollarSign size={14} />
-                        {(u.balance || 0).toLocaleString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                            <MoreVertical size={16} />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="glass border-white/10">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator className="bg-white/5" />
-                          <DropdownMenuItem onClick={() => openEditDialog(u)} className="gap-2">
-                            <Edit size={14} /> Edit Profile
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteUser(u.uid)} className="gap-2 text-rose-400 focus:text-rose-400">
-                            <Trash2 size={14} /> Delete User
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>
