@@ -18,12 +18,8 @@ import {
   Loader2, 
   ShieldCheck, 
   MoreVertical,
-  Mail,
-  Calendar,
-  DollarSign,
   Edit,
   Trash2,
-  ShieldAlert,
   PlusCircle,
   ArrowUpCircle,
   RefreshCw
@@ -108,6 +104,7 @@ export default function AdminUsersPage() {
         createdAt: serverTimestamp()
       };
 
+      // Mutación no bloqueante
       setDoc(userDocRef, userProfile)
         .then(() => {
           addDoc(collection(db, "users", newUserId, "transactions"), {
@@ -119,9 +116,7 @@ export default function AdminUsersPage() {
             date: new Date().toISOString(),
             type: "income"
           });
-          toast({ title: "Client Created Successfully" });
-          setRegisterOpen(false);
-          setNewUserData({ fullName: '', email: '', password: '', balance: 5000 });
+          toast({ title: "Account created successfully" });
         })
         .catch(async () => {
           const permissionError = new FirestorePermissionError({
@@ -131,6 +126,9 @@ export default function AdminUsersPage() {
           });
           errorEmitter.emit('permission-error', permissionError);
         });
+
+      setRegisterOpen(false);
+      setNewUserData({ fullName: '', email: '', password: '', balance: 5000 });
 
     } catch (error: any) {
       toast({
@@ -143,7 +141,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleDeposit = async (e: React.FormEvent) => {
+  const handleDeposit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser || !depositAmount || Number(depositAmount) <= 0) return;
     setIsProcessing(true);
@@ -152,41 +150,38 @@ export default function AdminUsersPage() {
     const userRef = doc(db, 'users', selectedUser.id);
     const txCollectionRef = collection(db, 'users', selectedUser.id, 'transactions');
 
-    try {
-      // 1. Actualizar balance de forma atómica
-      await updateDoc(userRef, {
-        balance: increment(amount)
-      });
-
-      // 2. Registrar transacción
-      await addDoc(txCollectionRef, {
-        userId: selectedUser.id,
-        merchant: "Admin Manual Deposit",
-        amount: amount,
-        category: "Income",
-        status: "Completed",
-        date: new Date().toISOString(),
-        type: "income",
-        reference: "Depósito de administrador"
-      });
-
-      toast({ 
-        title: "Deposit Successful", 
-        description: `Successfully added $${amount} to ${selectedUser.fullName}'s account.`
-      });
-      setDepositOpen(false);
-      setDepositAmount('');
-      setSelectedUser(null); // Limpiar para evitar datos obsoletos
-    } catch (error: any) {
+    // Mutación no bloqueante para actualización instantánea en UI
+    updateDoc(userRef, {
+      balance: increment(amount)
+    }).catch(async () => {
       const permissionError = new FirestorePermissionError({
         path: userRef.path,
         operation: 'update',
         requestResourceData: { balance: amount }
       });
       errorEmitter.emit('permission-error', permissionError);
-    } finally {
-      setIsProcessing(false);
-    }
+    });
+
+    addDoc(txCollectionRef, {
+      userId: selectedUser.id,
+      merchant: "Admin Manual Deposit",
+      amount: amount,
+      category: "Income",
+      status: "Completed",
+      date: new Date().toISOString(),
+      type: "income",
+      reference: "Admin deposit"
+    });
+
+    toast({ 
+      title: "Deposit Processed", 
+      description: `Adding $${amount} to ${selectedUser.fullName}.`
+    });
+    
+    setDepositOpen(false);
+    setDepositAmount('');
+    setSelectedUser(null);
+    setIsProcessing(false);
   };
 
   const handleUpdateUser = (e: React.FormEvent) => {
@@ -197,15 +192,12 @@ export default function AdminUsersPage() {
     const userRef = doc(db, 'users', selectedUser.id);
     const updateData = {
       fullName: selectedUser.fullName,
-      balance: Number(selectedUser.balance),
       role: selectedUser.role
     };
 
     updateDoc(userRef, updateData)
       .then(() => {
-        toast({ title: "User updated successfully" });
-        setEditOpen(false);
-        setSelectedUser(null);
+        toast({ title: "User updated" });
       })
       .catch(async () => {
         const permissionError = new FirestorePermissionError({
@@ -214,28 +206,26 @@ export default function AdminUsersPage() {
           requestResourceData: updateData
         });
         errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => setIsProcessing(false));
+      });
+
+    setEditOpen(false);
+    setSelectedUser(null);
+    setIsProcessing(false);
   };
 
   const handleDeleteUser = (userId: string) => {
-    if (!confirm("¿Estás seguro de eliminar este usuario?")) return;
+    if (!confirm("Are you sure?")) return;
     
     const userRef = doc(db, 'users', userId);
-    deleteDoc(userRef)
-      .then(() => {
-        toast({ title: "Usuario eliminado" });
-      })
-      .catch(async () => {
-        const permissionError = new FirestorePermissionError({
-          path: userRef.path,
-          operation: 'delete'
-        });
-        errorEmitter.emit('permission-error', permissionError);
+    deleteDoc(userRef).catch(async () => {
+      const permissionError = new FirestorePermissionError({
+        path: userRef.path,
+        operation: 'delete'
       });
+      errorEmitter.emit('permission-error', permissionError);
+    });
   };
 
-  // Cálculo de reservas garantizando tipos numéricos
   const totalReserves = useMemo(() => {
     return users.reduce((acc, u) => acc + (Number(u.balance) || 0), 0);
   }, [users]);
@@ -319,10 +309,6 @@ export default function AdminUsersPage() {
               <div className="space-y-2">
                 <Label>Name</Label>
                 <Input value={selectedUser.fullName} onChange={e => setSelectedUser({...selectedUser, fullName: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label>Balance</Label>
-                <Input type="number" value={selectedUser.balance} onChange={e => setSelectedUser({...selectedUser, balance: e.target.value})} />
               </div>
               <DialogFooter><Button type="submit" disabled={isProcessing}>Save Changes</Button></DialogFooter>
             </form>

@@ -40,7 +40,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth, useUser, useDoc, useFirestore } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { doc, getDocs, collection, query, limit, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDocs, collection, query, limit, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -55,7 +55,7 @@ function TopNav({ userData }: { userData: any }) {
         <div className="hidden md:flex relative w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Buscar en AEON..." 
+            placeholder="Search AEON..." 
             className="pl-9 bg-muted/50 border-none focus-visible:ring-1"
           />
         </div>
@@ -231,12 +231,16 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
   useEffect(() => {
     if (!userLoading && user && !docLoading && !userData) {
       const initializeProfile = async () => {
+        // Double check if doc exists with getDoc to avoid race conditions
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (snap.exists()) return;
+
         let isFirstUser = false;
         try {
           const usersSnap = await getDocs(query(collection(db, "users"), limit(1)));
           isFirstUser = usersSnap.empty;
         } catch (e) {
-          // Silent catch for initial permission checks
+          // Silent catch
         }
 
         const finalRole = (isFirstUser || user.email === 'vallrack67@gmail.com') ? 'admin' : 'user';
@@ -244,7 +248,7 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
         const profileData = {
           uid: user.uid,
           email: user.email,
-          fullName: user.displayName || user.email?.split('@')[0] || 'Nuevo Cliente',
+          fullName: user.displayName || user.email?.split('@')[0] || 'New Client',
           balance: 5000,
           role: finalRole,
           createdAt: serverTimestamp(),
