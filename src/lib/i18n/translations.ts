@@ -419,13 +419,7 @@ export const translations = {
       add_balance: "Add balance to account of",
       amount_usd: "Amount (USD)",
     },
-    common: {
-      title: "Virtual Cards",
-      subtitle: "Secure your online purchases with dynamic cards.",
-      create_card: "Create New Card",
-      monthly_limit: "Monthly Spending Limit",
-      freeze: "Freeze",
-    },
+
     transfers: {
       title: "Fund Transfer",
       subtitle: "AEON Network internal payment ecosystem.",
