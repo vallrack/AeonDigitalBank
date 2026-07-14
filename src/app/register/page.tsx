@@ -12,7 +12,8 @@ import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
-import { useAuth, useFirestore } from '@/firebase';
+import { ref, uploadString } from 'firebase/storage';
+import { useAuth, useFirestore, useStorage } from '@/firebase';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useI18n } from '@/lib/i18n/context';
@@ -21,6 +22,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const auth = useAuth();
   const db = useFirestore();
+  const storage = useStorage();
   const { t } = useI18n();
   const [step, setStep] = useState(1);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -120,6 +122,16 @@ export default function RegisterPage() {
       const user = userCredential.user;
 
       await updateProfile(user, { displayName: formData.fullName });
+
+      // Upload KYC Docs to Storage
+      if (idPhoto) {
+        const idRef = ref(storage, `users/${user.uid}/kyc/id_document.jpg`);
+        await uploadString(idRef, idPhoto, 'data_url');
+      }
+      if (facePhoto) {
+        const faceRef = ref(storage, `users/${user.uid}/kyc/selfie.jpg`);
+        await uploadString(faceRef, facePhoto, 'data_url');
+      }
 
       // El backend (Firebase Functions - onUserCreated) se encarga de crear el perfil en Firestore,
       // asignar el rol correcto, el bono de bienvenida y generar la tarjeta virtual de forma segura.

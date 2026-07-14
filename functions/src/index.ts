@@ -1,8 +1,21 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import * as nodemailer from "nodemailer";
 
 admin.initializeApp();
 const db = admin.firestore();
+
+// TODO: Configura aquí tus credenciales de Brevo (Sendinblue) SMTP
+const transporter = nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false, // true para port 465
+  auth: {
+    user: 'TU_CORREO_DE_BREVO_AQUI', 
+    pass: 'TU_CONTRASEÑA_SMTP_DE_BREVO_AQUI'
+  }
+});
+const SENDER_EMAIL = 'no-reply@aeonbank.com'; // Correo que aparecerá como remitente
 
 // 1. onUserCreated: Setup new user profile securely
 export const onUserCreated = functions.auth.user().onCreate(async (user) => {
@@ -99,7 +112,7 @@ export const processTransfer = functions.https.onCall(async (data, context) => {
   const recipientRef = db.collection("users").doc(recipientId);
 
   try {
-    await db.runTransaction(async (t) => {
+    const result = await db.runTransaction(async (t) => {
       const senderDoc = await t.get(senderRef);
       const recipientDoc = await t.get(recipientRef);
 
@@ -145,10 +158,207 @@ export const processTransfer = functions.https.onCall(async (data, context) => {
         senderId: senderId,
         network: "AEON_INTERNAL"
       });
+
+      return { senderData, recipientData };
     });
+
+    // Send Emails via Nodemailer (Brevo) outside the transaction
+    const sData = result.senderData;
+    const rData = result.recipientData;
+
+    try {
+      if (sData?.email) {
+        await transporter.sendMail({
+          from: `"Aeon Digital Bank" <${SENDER_EMAIL}>`,
+          to: sData.email,
+          subject: `Transferencia Exitosa de $${amount} USD`,
+          html: `<p>Hola ${sData.fullName},</p>
+                 <p>Has transferido <b>$${amount} USD</b> a ${rData?.fullName}.</p>
+                 <p>Concepto: ${reference || "Sin concepto"}</p>
+                 <p>Gracias por usar Aeon Digital Bank.</p>`
+        });
+      }
+
+      if (rData?.email) {
+        await transporter.sendMail({
+          from: `"Aeon Digital Bank" <${SENDER_EMAIL}>`,
+          to: rData.email,
+          subject: `Has recibido $${amount} USD de ${sData?.fullName}`,
+          html: `<p>Hola ${rData.fullName},</p>
+                 <p>Has recibido <b>$${amount} USD</b> de parte de ${sData?.fullName}.</p>
+                 <p>Concepto: ${reference || "Sin concepto"}</p>
+                 <p>Gracias por usar Aeon Digital Bank.</p>`
+        });
+      }
+    } catch (emailError) {
+      console.error("Error enviando correos:", emailError);
+      // We don't throw here because the transfer was already successful
+    }
 
     return { success: true };
   } catch (error: any) {
     throw new functions.https.HttpsError("internal", error.message);
   }
 });
+
+// 4. Admin Functions
+export const adminCreateUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+  
+  const callerSnap = await db.collection("users").doc(context.auth.uid).get();
+  if (callerSnap.data()?.role !== "admin") {
+    throw new functions.https.HttpsError("permission-denied", "Requires admin role.");
+  }
+
+  const { email, password, fullName, balance } = data;
+  
+  try {
+    const userRecord = await admin.auth().createUser({
+      email,
+      password,
+      displayName: fullName,
+    });
+
+    const initBalance = Number(balance) || 0;
+
+    await db.collection("users").doc(userRecord.uid).set({
+      uid: userRecord.uid,
+      email: email,
+      fullName: fullName,
+      balance: initBalance,
+      role: "user",
+      kycStatus: "Verified",
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    if (initBalance > 0) {
+      await db.collection("users").doc(userRecord.uid).collection("transactions").add({
+        userId: userRecord.uid,
+        merchant: "Admin Initial Deposit",
+        amount: initBalance,
+        category: "Income",
+        status: "Completed",
+        date: new Date().toISOString(),
+        type: "income",
+        network: "AEON_INTERNAL"
+      });
+    }
+
+    return { uid: userRecord.uid };
+  } catch (error: any) {
+    throw new functions.https.HttpsError("internal", error.message);
+  }
+});
+
+export const adminDeposit = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+  const callerSnap = await db.collection("users").doc(context.auth.uid).get();
+  if (callerSnap.data()?.role !== "admin") throw new functions.https.HttpsError("permission-denied", "Requires admin role.");
+
+  const { userId, amount } = data;
+  const numAmount = Number(amount);
+  
+  const userRef = db.collection("users").doc(userId);
+  await userRef.update({ balance: admin.firestore.FieldValue.increment(numAmount) });
+  
+  await userRef.collection("transactions").add({
+    userId,
+    merchant: "Admin Manual Deposit",
+    amount: numAmount,
+    category: "Income",
+    status: "Completed",
+    date: new Date().toISOString(),
+    type: "income",
+    reference: "Admin deposit",
+    network: "AEON_INTERNAL"
+  });
+
+  return { success: true };
+});
+
+export const adminUpdateUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+  const callerSnap = await db.collection("users").doc(context.auth.uid).get();
+  if (callerSnap.data()?.role !== "admin") throw new functions.https.HttpsError("permission-denied", "Requires admin role.");
+
+  const { userId, fullName, balance } = data;
+  const userRef = db.collection("users").doc(userId);
+  const userSnap = await userRef.get();
+  const oldBalance = userSnap.data()?.balance || 0;
+  const newBalance = Number(balance);
+  const diff = newBalance - oldBalance;
+
+  await userRef.update({ fullName, balance: newBalance });
+
+  if (diff !== 0) {
+    await userRef.collection("transactions").add({
+      userId,
+      merchant: "Admin Balance Adjustment",
+      amount: Math.abs(diff),
+      category: "Adjustment",
+      status: "Completed",
+      date: new Date().toISOString(),
+      type: diff > 0 ? "income" : "expense",
+      reference: "Manual adjustment by admin"
+    });
+  }
+
+  return { success: true };
+});
+
+export const adminDeleteUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+  const callerSnap = await db.collection("users").doc(context.auth.uid).get();
+  if (callerSnap.data()?.role !== "admin") throw new functions.https.HttpsError("permission-denied", "Requires admin role.");
+
+  const { userId } = data;
+  await admin.auth().deleteUser(userId);
+  await db.collection("users").doc(userId).delete();
+  
+  return { success: true };
+});
+
+// 5. Virtual Cards Functions
+export const createVirtualCard = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+  
+  const userSnap = await db.collection("users").doc(context.auth.uid).get();
+  const uData = userSnap.data();
+
+  const crypto = require("crypto");
+  const randomCard = "4255" + crypto.randomInt(100000000000, 999999999999).toString();
+  const randomCvv = crypto.randomInt(100, 999).toString();
+
+  const newCard = {
+    userId: context.auth.uid,
+    cardHolder: (uData?.fullName || "VALUED CUSTOMER").toUpperCase(),
+    cardNumber: randomCard,
+    expiryDate: "12/28",
+    cvv: randomCvv,
+    isFrozen: false,
+    type: "standard",
+    createdAt: new Date().toISOString()
+  };
+
+  await db.collection("users").doc(context.auth.uid).collection("virtualCards").add(newCard);
+  return { success: true };
+});
+
+export const toggleVirtualCardFreeze = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+  
+  const { cardId, isFrozen } = data;
+  await db.collection("users").doc(context.auth.uid).collection("virtualCards").doc(cardId).update({
+    isFrozen: isFrozen
+  });
+  return { success: true };
+});
+
+export const deleteVirtualCard = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
+  
+  const { cardId } = data;
+  await db.collection("users").doc(context.auth.uid).collection("virtualCards").doc(cardId).delete();
+  return { success: true };
+});
+

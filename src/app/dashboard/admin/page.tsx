@@ -41,12 +41,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from '@/hooks/use-toast';
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { firebaseConfig } from '@/firebase/config';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useI18n } from '@/lib/i18n/context';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 export default function AdminUsersPage() {
   const { user: currentUser } = useUser();
@@ -83,44 +81,19 @@ export default function AdminUsersPage() {
     setIsProcessing(true);
 
     try {
-      const secondaryApp = getApps().find(app => app.name === 'AdminTool') || initializeApp(firebaseConfig, 'AdminTool');
-      const secondaryAuth = getAuth(secondaryApp);
-
-      const userCredential = await createUserWithEmailAndPassword(
-        secondaryAuth, 
-        newUserData.email, 
-        newUserData.password
-      );
+      const functions = getFunctions();
+      const adminCreateUser = httpsCallable(functions, 'adminCreateUser');
       
-      const newUserId = userCredential.user.uid;
-
-      const userDocRef = doc(db, "users", newUserId);
-      const userProfile = {
-        uid: newUserId,
+      await adminCreateUser({
         email: newUserData.email,
+        password: newUserData.password,
         fullName: newUserData.fullName,
-        balance: Number(newUserData.balance),
-        role: "user",
-        kycStatus: 'Verified',
-        createdAt: serverTimestamp()
-      };
-
-      await setDoc(userDocRef, userProfile);
-      
-      await addDoc(collection(db, "users", newUserId, "transactions"), {
-        userId: newUserId,
-        merchant: "Aeon Welcome Bonus",
-        amount: Number(newUserData.balance),
-        category: "Income",
-        status: "Completed",
-        date: new Date().toISOString(),
-        type: "income"
+        balance: newUserData.balance
       });
 
       toast({ title: t.common.success });
       setRegisterOpen(false);
       setNewUserData({ fullName: '', email: '', password: '', balance: 5000 });
-
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -132,103 +105,75 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleDeposit = (e: React.FormEvent) => {
+  const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser || !depositAmount || Number(depositAmount) <= 0) return;
     setIsProcessing(true);
 
-    const amount = Number(depositAmount);
-    const userRef = doc(db, 'users', selectedUser.id);
-    const txCollectionRef = collection(db, 'users', selectedUser.id, 'transactions');
-
-    updateDoc(userRef, {
-      balance: increment(amount)
-    }).then(() => {
-      addDoc(txCollectionRef, {
+    try {
+      const functions = getFunctions();
+      const adminDeposit = httpsCallable(functions, 'adminDeposit');
+      await adminDeposit({
         userId: selectedUser.id,
-        merchant: "Admin Manual Deposit",
-        amount: amount,
-        category: "Income",
-        status: "Completed",
-        date: new Date().toISOString(),
-        type: "income",
-        reference: "Admin deposit"
+        amount: Number(depositAmount)
       });
       toast({ title: t.admin.deposit + " " + t.common.success });
-    }).catch(async () => {
-      const permissionError = new FirestorePermissionError({
-        path: userRef.path,
-        operation: 'update',
-        requestResourceData: { balance: amount }
-      });
-      errorEmitter.emit('permission-error', permissionError);
-    }).finally(() => {
       setDepositOpen(false);
       setDepositAmount('');
       setSelectedUser(null);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: t.common.error,
+        description: error.message,
+      });
+    } finally {
       setIsProcessing(false);
-    });
+    }
   };
 
-  const handleUpdateUser = (e: React.FormEvent) => {
+  const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
     setIsProcessing(true);
 
-    const userRef = doc(db, 'users', selectedUser.id);
-    const originalUser = users.find(u => u.id === selectedUser.id);
-    const oldBalance = Number(originalUser?.balance || 0);
-    const newBalance = Number(selectedUser.balance);
-    const difference = newBalance - oldBalance;
-
-    const updateData = {
-      fullName: selectedUser.fullName,
-      role: selectedUser.role || originalUser?.role || 'user',
-      balance: newBalance
-    };
-
-    updateDoc(userRef, updateData)
-      .then(() => {
-        if (difference !== 0) {
-          addDoc(collection(db, "users", selectedUser.id, "transactions"), {
-            userId: selectedUser.id,
-            merchant: "Admin Balance Adjustment",
-            amount: Math.abs(difference),
-            category: "Adjustment",
-            status: "Completed",
-            date: new Date().toISOString(),
-            type: difference > 0 ? "income" : "expense",
-            reference: "Manual adjustment by admin"
-          });
-        }
-        toast({ title: t.common.save + " " + t.common.success });
-      })
-      .catch(async () => {
-        const permissionError = new FirestorePermissionError({
-          path: userRef.path,
-          operation: 'update',
-          requestResourceData: updateData
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => {
-        setEditOpen(false);
-        setSelectedUser(null);
-        setIsProcessing(false);
+    try {
+      const functions = getFunctions();
+      const adminUpdateUser = httpsCallable(functions, 'adminUpdateUser');
+      await adminUpdateUser({
+        userId: selectedUser.id,
+        fullName: selectedUser.fullName,
+        balance: selectedUser.balance
       });
+      toast({ title: t.common.save + " " + t.common.success });
+      setEditOpen(false);
+      setSelectedUser(null);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: t.common.error,
+        description: error.message,
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (!confirm(t.common.confirm + "?")) return;
     
-    const userRef = doc(db, 'users', userId);
-    deleteDoc(userRef).catch(async () => {
-      const permissionError = new FirestorePermissionError({
-        path: userRef.path,
-        operation: 'delete'
+    try {
+      const functions = getFunctions();
+      const adminDeleteUser = httpsCallable(functions, 'adminDeleteUser');
+      await adminDeleteUser({ userId });
+      toast({ title: t.common.success });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: t.common.error,
+        description: error.message,
       });
-      errorEmitter.emit('permission-error', permissionError);
-    });
+    }
   };
 
   const totalReserves = useMemo(() => {

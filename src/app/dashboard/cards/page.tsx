@@ -13,10 +13,11 @@ import { Slider } from '@/components/ui/slider';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useUser, useFirestore, useCollection } from '@/firebase';
-import { collection, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useI18n } from '@/lib/i18n/context';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 export default function CardsPage() {
   const { user, loading: userLoading } = useUser();
@@ -32,69 +33,58 @@ export default function CardsPage() {
 
   const { data: cards, loading: cardsLoading } = useCollection(cardsQuery);
 
-  const handleCreateCard = () => {
+  const handleCreateCard = async () => {
     if (!user) return;
     setIsCreating(true);
 
-    const newCard = {
-      userId: user.uid,
-      cardHolder: user.displayName || user.email?.split('@')[0].toUpperCase() || 'VALUED CUSTOMER',
-      cardNumber: Array.from({ length: 4 }, () => Math.floor(1000 + Math.random() * 9000)).join(''),
-      expiryDate: '12/28',
-      cvv: Math.floor(100 + Math.random() * 899).toString(),
-      isFrozen: false,
-      type: 'standard',
-      createdAt: new Date().toISOString()
-    };
-
-    addDoc(collection(db, 'users', user.uid, 'virtualCards'), newCard)
-      .then(() => {
-        toast({
-          title: t.cards.success_create,
-          description: t.cards.success_create_desc,
-        });
-      })
-      .catch(async (error) => {
-        const permissionError = new FirestorePermissionError({
-          path: `users/${user.uid}/virtualCards`,
-          operation: 'create',
-          requestResourceData: newCard
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => setIsCreating(false));
+    try {
+      const functions = getFunctions();
+      const createVirtualCard = httpsCallable(functions, 'createVirtualCard');
+      await createVirtualCard();
+      toast({
+        title: t.cards.success_create,
+        description: t.cards.success_create_desc,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: t.common.error,
+        description: error.message,
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const toggleFreeze = (card: any) => {
+  const toggleFreeze = async (card: any) => {
     if (!user) return;
-    const cardRef = doc(db, 'users', user.uid, 'virtualCards', card.id);
-    
-    updateDoc(cardRef, { isFrozen: !card.isFrozen })
-      .catch(async () => {
-        const permissionError = new FirestorePermissionError({
-          path: cardRef.path,
-          operation: 'update',
-          requestResourceData: { isFrozen: !card.isFrozen }
-        });
-        errorEmitter.emit('permission-error', permissionError);
+    try {
+      const functions = getFunctions();
+      const toggleVirtualCardFreeze = httpsCallable(functions, 'toggleVirtualCardFreeze');
+      await toggleVirtualCardFreeze({ cardId: card.id, isFrozen: !card.isFrozen });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: t.common.error,
+        description: error.message,
       });
+    }
   };
 
-  const deleteCard = (cardId: string) => {
+  const deleteCard = async (cardId: string) => {
     if (!user) return;
-    const cardRef = doc(db, 'users', user.uid, 'virtualCards', cardId);
-    
-    deleteDoc(cardRef)
-      .then(() => {
-        toast({ title: t.cards.success_delete });
-      })
-      .catch(async () => {
-        const permissionError = new FirestorePermissionError({
-          path: cardRef.path,
-          operation: 'delete'
-        });
-        errorEmitter.emit('permission-error', permissionError);
+    try {
+      const functions = getFunctions();
+      const deleteVirtualCard = httpsCallable(functions, 'deleteVirtualCard');
+      await deleteVirtualCard({ cardId });
+      toast({ title: t.cards.success_delete });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: t.common.error,
+        description: error.message,
       });
+    }
   };
 
   if (userLoading || cardsLoading) {
