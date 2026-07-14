@@ -164,10 +164,10 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0E1016] flex flex-col items-center justify-center p-6 relative">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative">
       {/* Botón de Regresar */}
       <div className="absolute top-8 left-8">
-        <Button variant="ghost" asChild className="gap-2 text-muted-foreground hover:text-white transition-colors">
+        <Button variant="ghost" asChild className="gap-2 text-muted-foreground hover:text-primary transition-colors">
           <Link href="/">
             <ArrowLeft size={18} />
             {t.common.back}
@@ -308,7 +308,7 @@ export default function RegisterPage() {
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          className="mt-2 text-muted-foreground hover:text-white"
+                          className="mt-2 text-muted-foreground hover:text-primary"
                           onClick={startCamera}
                         >
                           <RefreshCw size={14} className="mr-2" /> {t.auth.reg_selfie_retake}

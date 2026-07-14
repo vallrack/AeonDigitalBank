@@ -17,12 +17,12 @@ export default function LandingPage() {
   const { t, language, setLanguage } = useI18n();
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0E1016]">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Navbar */}
       <nav className="h-20 flex items-center justify-between px-4 md:px-12 fixed top-0 w-full z-50 glass border-b border-white/5">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center glow-indigo">
-            <span className="text-white font-headline font-bold text-xl">A</span>
+            <span className="text-primary font-headline font-bold text-xl">A</span>
           </div>
           <span className="font-headline font-bold text-2xl tracking-tight hidden sm:inline">
             AEON <span className="text-accent">BANK</span>
@@ -138,16 +138,16 @@ export default function LandingPage() {
         <div className="flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-white font-headline font-bold text-xs">A</span>
+              <span className="text-primary font-headline font-bold text-xs">A</span>
             </div>
             <span className="font-headline font-bold text-lg tracking-tight">AEON BANK</span>
           </div>
           
           <div className="flex flex-wrap justify-center gap-4 sm:gap-8 text-sm text-muted-foreground">
-            <Link href="#" className="hover:text-white transition-colors">{t.landing.footer_privacy}</Link>
-            <Link href="#" className="hover:text-white transition-colors">{t.landing.footer_terms}</Link>
-            <Link href="#" className="hover:text-white transition-colors">{t.landing.footer_cookies}</Link>
-            <Link href="#" className="hover:text-white transition-colors">{t.landing.footer_status}</Link>
+            <Link href="#" className="hover:text-primary transition-colors">{t.landing.footer_privacy}</Link>
+            <Link href="#" className="hover:text-primary transition-colors">{t.landing.footer_terms}</Link>
+            <Link href="#" className="hover:text-primary transition-colors">{t.landing.footer_cookies}</Link>
+            <Link href="#" className="hover:text-primary transition-colors">{t.landing.footer_status}</Link>
           </div>
 
           <p className="text-xs text-muted-foreground">

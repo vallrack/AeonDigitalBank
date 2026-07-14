@@ -69,10 +69,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0E1016] flex flex-col items-center justify-center p-6 relative">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative">
       {/* Botón de Regresar */}
       <div className="absolute top-8 left-8">
-        <Button variant="ghost" asChild className="gap-2 text-muted-foreground hover:text-white transition-colors">
+        <Button variant="ghost" asChild className="gap-2 text-muted-foreground hover:text-primary transition-colors">
           <Link href="/">
             <ArrowLeft size={18} />
             {t.common.back}
@@ -83,7 +83,7 @@ export default function LoginPage() {
       <div className="mb-8 flex flex-col items-center gap-4">
         <Link href="/" className="flex items-center gap-2">
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center glow-indigo">
-             <span className="text-white font-headline font-bold text-2xl">A</span>
+             <span className="text-primary font-headline font-bold text-2xl">A</span>
           </div>
         </Link>
         <div className="text-center">
@@ -133,7 +133,7 @@ export default function LoginPage() {
                 />
                 <button 
                   type="button"
-                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-white"
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}

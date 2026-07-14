@@ -44,7 +44,7 @@ export default function ActivityPage() {
     // Header
     doc.setFontSize(22);
     doc.setTextColor(30, 58, 138); 
-    doc.text("Aeon Digital Bank", 14, 22);
+    doc.text("Aeon Bank", 14, 22);
     
     doc.setFontSize(12);
     doc.setTextColor(100);

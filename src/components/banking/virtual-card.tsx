@@ -103,7 +103,7 @@ export function VirtualCard({
               </div>
             </div>
             <p className="text-[8px] opacity-40 leading-tight">
-              Authorized Signature - Not Valid Unless Signed. This card is issued by Aeon Digital Bank and is subject to the terms and conditions of use.
+              Authorized Signature - Not Valid Unless Signed. This card is issued by Aeon Bank and is subject to the terms and conditions of use.
             </p>
           </div>
 
