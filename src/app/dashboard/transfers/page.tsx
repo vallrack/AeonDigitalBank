@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2, Search, User, CreditCard, Sparkles } from 'lucide-react';
-import { useUser, useFirestore, useDoc } from '@/firebase';
-import { doc, collection, writeBatch, increment, getDocs, query, where, limit, collectionGroup } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useFunctions } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { predictiveFraudMonitoring } from '@/ai/flows/predictive-fraud-monitoring';
 import { intelligentExpenseCategorization } from '@/ai/flows/intelligent-expense-categorization';
 import { toast } from '@/hooks/use-toast';
@@ -33,42 +34,17 @@ export default function TransfersPage() {
   const [fraudResult, setFraudResult] = useState<any>(null);
   const [step, setStep] = useState(1);
 
+  const functions = useFunctions();
+
   const findRecipient = async () => {
     if (!searchQuery) return;
     setIsProcessing(true);
     try {
-      let foundUser = null;
-      const cleanQuery = searchQuery.trim();
+      const searchFn = httpsCallable(functions, 'searchRecipient');
+      const result = await searchFn({ query: searchQuery });
+      const foundUser = result.data as { uid: string, fullName: string };
 
-      // 1. Intentar buscar por Email
-      if (cleanQuery.includes('@')) {
-        const q = query(collection(db, 'users'), where('email', '==', cleanQuery.toLowerCase()), limit(1));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          foundUser = snap.docs[0].data();
-        }
-      } 
-      // 2. Intentar buscar por Número de Tarjeta AEON
-      else if (cleanQuery.length >= 10) {
-        const q = query(collectionGroup(db, 'virtualCards'), where('cardNumber', '==', cleanQuery), limit(1));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          const cardData = snap.docs[0].data();
-          // Obtener el perfil del dueño de la tarjeta
-          const userSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', cardData.userId), limit(1)));
-          if (!userSnap.empty) {
-            foundUser = userSnap.docs[0].data();
-          }
-        }
-      }
-
-      if (!foundUser) {
-        toast({
-          variant: "destructive",
-          title: "Destinatario no encontrado",
-          description: "Verifica que el email o número de tarjeta pertenezca a la Red AEON."
-        });
-      } else if (foundUser.uid === user?.uid) {
+      if (foundUser.uid === user?.uid) {
         toast({ 
           variant: "destructive", 
           title: "Operación no válida", 
@@ -78,11 +54,11 @@ export default function TransfersPage() {
         setRecipientUser(foundUser);
         setStep(2);
       }
-    } catch (error) {
-      toast({ 
-        variant: "destructive", 
-        title: "Error de búsqueda", 
-        description: "Hubo un problema al validar el destinatario en el ecosistema AEON." 
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Destinatario no encontrado",
+        description: "Verifica que el email o número de tarjeta pertenezca a la Red AEON."
       });
     } finally {
       setIsProcessing(false);
@@ -147,64 +123,32 @@ export default function TransfersPage() {
     }
   };
 
-  const confirmTransfer = () => {
+  const confirmTransfer = async () => {
     if (!user || !userData || !recipientUser) return;
     setIsProcessing(true);
 
     const numAmount = parseFloat(amount);
-    const batch = writeBatch(db);
 
-    const senderTxRef = doc(collection(db, 'users', user.uid, 'transactions'));
-    const recipientTxRef = doc(collection(db, 'users', recipientUser.uid, 'transactions'));
-    const senderUserRef = doc(db, 'users', user.uid);
-    const recipientUserRef = doc(db, 'users', recipientUser.uid);
+    try {
+      const processTransferFn = httpsCallable(functions, 'processTransfer');
+      await processTransferFn({
+        recipientId: recipientUser.uid,
+        amount: numAmount,
+        reference: reference,
+        aiCategory: aiCategory
+      });
 
-    // 1. Transacción del emisor (Gasto)
-    batch.set(senderTxRef, {
-      userId: user.uid,
-      merchant: `Transferencia a ${recipientUser.fullName}`,
-      amount: numAmount,
-      category: aiCategory,
-      status: 'Completed',
-      date: new Date().toISOString(),
-      type: 'expense',
-      reference: reference,
-      recipientId: recipientUser.uid,
-      network: 'AEON_INTERNAL'
-    });
-
-    // 2. Transacción del receptor (Ingreso)
-    batch.set(recipientTxRef, {
-      userId: recipientUser.uid,
-      merchant: `Transferencia de ${userData.fullName}`,
-      amount: numAmount,
-      category: 'Income',
-      status: 'Completed',
-      date: new Date().toISOString(),
-      type: 'income',
-      reference: reference,
-      senderId: user.uid,
-      network: 'AEON_INTERNAL'
-    });
-
-    // 3. Actualizar balances atómicamente
-    batch.update(senderUserRef, { balance: increment(-numAmount) });
-    batch.update(recipientUserRef, { balance: increment(numAmount) });
-
-    batch.commit()
-      .then(() => {
-        setStep(4);
-        toast({ title: "Transferencia Exitosa" });
-      })
-      .catch(async () => {
-        const permissionError = new FirestorePermissionError({
-          path: `users/${user.uid}/transactions`,
-          operation: 'write',
-          requestResourceData: { amount: numAmount }
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => setIsProcessing(false));
+      setStep(4);
+      toast({ title: "Transferencia Exitosa" });
+    } catch (error: any) {
+      toast({ 
+        variant: "destructive", 
+        title: "Error en la transacción", 
+        description: error.message || "No se pudo procesar la transferencia."
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (

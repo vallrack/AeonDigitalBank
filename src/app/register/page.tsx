@@ -121,45 +121,14 @@ export default function RegisterPage() {
 
       await updateProfile(user, { displayName: formData.fullName });
 
-      // Determinamos el rol basándonos en el email del administrador principal
-      const assignedRole = formData.email === 'vallrack67@gmail.com' ? "admin" : "user";
+      // El backend (Firebase Functions - onUserCreated) se encarga de crear el perfil en Firestore,
+      // asignar el rol correcto, el bono de bienvenida y generar la tarjeta virtual de forma segura.
 
-      // Guardamos la información del perfil
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        email: formData.email,
-        fullName: formData.fullName,
-        balance: 5000.00,
-        role: assignedRole,
-        kycStatus: 'Verified',
-        createdAt: serverTimestamp()
-      });
-
-      // Creamos la transacción inicial de bienvenida
-      await addDoc(collection(db, "users", user.uid, "transactions"), {
-        userId: user.uid,
-        merchant: "Aeon Bank Welcome Bonus",
-        amount: 5000.00,
-        category: "Income",
-        status: "Completed",
-        date: new Date().toISOString(),
-        type: "income"
-      });
-
-      // Generamos la tarjeta virtual inicial
-      await addDoc(collection(db, "users", user.uid, "virtualCards"), {
-        userId: user.uid,
-        cardHolder: formData.fullName.toUpperCase(),
-        cardNumber: "4255" + Math.floor(100000000000 + Math.random() * 900000000000).toString(),
-        expiryDate: "12/28",
-        cvv: Math.floor(100 + Math.random() * 899).toString(),
-        isFrozen: false,
-        type: "standard"
-      });
+      const isAdmin = formData.email === 'vallrack67@gmail.com';
 
       toast({
-        title: assignedRole === "admin" ? "Súper Admin Activado" : "Cuenta Activada",
-        description: "Bienvenido al futuro de la banca digital Aeon.",
+        title: isAdmin ? "Súper Admin Activado" : "Cuenta Activada",
+        description: "Bienvenido al futuro de la banca digital Aeon. Creando entorno seguro...",
       });
 
       setStep(4);
