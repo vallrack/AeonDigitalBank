@@ -2,7 +2,7 @@
 "use client"
 
 import React, { useState, useMemo } from 'react';
-import { VirtualCard } from '@/components/banking/virtual-card';
+import { VirtualCard, CardStyleType } from '@/components/banking/virtual-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Power, ShieldAlert, Sliders, Trash2, Zap, Loader2 } from 'lucide-react';
@@ -14,10 +14,9 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import { collection, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 import { useI18n } from '@/lib/i18n/context';
-
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function CardsPage() {
   const { user, loading: userLoading } = useUser();
@@ -25,6 +24,8 @@ export default function CardsPage() {
   const { t } = useI18n();
   const [isCreating, setIsCreating] = useState(false);
   const [limit, setLimit] = useState([1500]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [selectedType, setSelectedType] = useState<CardStyleType>('customized-cash');
 
   const cardsQuery = useMemo(() => {
     if (!user) return null;
@@ -33,7 +34,8 @@ export default function CardsPage() {
 
   const { data: cards, loading: cardsLoading } = useCollection(cardsQuery);
 
-  const handleCreateCard = async () => {
+  const handleCreateCard = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!user) return;
     setIsCreating(true);
 
@@ -48,7 +50,7 @@ export default function CardsPage() {
         expiryDate: "12/28",
         cvv: randomCvv,
         isFrozen: false,
-        type: "standard",
+        type: selectedType,
         createdAt: new Date().toISOString()
       });
 
@@ -56,6 +58,7 @@ export default function CardsPage() {
         title: t.cards.success_create,
         description: t.cards.success_create_desc,
       });
+      setCreateOpen(false);
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -83,6 +86,7 @@ export default function CardsPage() {
 
   const deleteCard = async (cardId: string) => {
     if (!user) return;
+    if (!confirm(t.common.confirm + "?")) return;
     try {
       const cardRef = doc(db, 'users', user.uid, 'virtualCards', cardId);
       await deleteDoc(cardRef);
@@ -100,8 +104,8 @@ export default function CardsPage() {
     return <div className="flex justify-center p-20"><Loader2 className="animate-spin text-primary h-10 w-10" /></div>;
   }
 
-  const standardCards = cards.filter(c => c.type === 'standard');
-  const disposableCards = cards.filter(c => c.type === 'disposable');
+  // Ahora mostraremos todas las tarjetas juntas
+  const allCards = cards || [];
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -110,26 +114,59 @@ export default function CardsPage() {
           <h1 className="text-3xl font-headline font-bold">{t.cards.title}</h1>
           <p className="text-muted-foreground">{t.cards.subtitle}</p>
         </div>
-        <Button 
-          className="gap-2 glow-indigo" 
-          onClick={handleCreateCard} 
-          disabled={isCreating}
-        >
-          {isCreating ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-          {t.cards.create_card}
-        </Button>
+        
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2 glow-indigo">
+              <Plus size={16} />
+              {t.cards.create_card}
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="glass border-white/10 sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="font-headline text-xl">Crear Tarjeta Virtual</DialogTitle>
+              <DialogDescription>Elige el modelo de tarjeta que prefieras.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-6">
+              <div className="flex justify-center">
+                <VirtualCard 
+                  cardHolder={(user?.displayName || "VALUED CUSTOMER").toUpperCase()}
+                  cardNumber="•••• •••• •••• 1234"
+                  expiryDate="12/28"
+                  cvv="***"
+                  type={selectedType}
+                  interactive={false}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Modelo de Tarjeta</Label>
+                <Select value={selectedType} onValueChange={(val: CardStyleType) => setSelectedType(val)}>
+                  <SelectTrigger className="bg-background/50 border-white/10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="glass border-white/10">
+                    <SelectItem value="customized-cash">Customized Cash Rewards (Roja)</SelectItem>
+                    <SelectItem value="unlimited-cash">Unlimited Cash Rewards (Gris/Plata)</SelectItem>
+                    <SelectItem value="travel-rewards">Travel Rewards (Azul oscuro)</SelectItem>
+                    <SelectItem value="bankamericard">BankAmericard (Blanca)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleCreateCard} className="w-full glow-indigo" disabled={isCreating}>
+                {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Generar Tarjeta"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-5 space-y-6">
-          <Tabs defaultValue="all" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-muted/50 border border-border/50">
-              <TabsTrigger value="all">{t.cards.main_cards} ({standardCards.length})</TabsTrigger>
-              <TabsTrigger value="disposable">{t.cards.disposable} ({disposableCards.length})</TabsTrigger>
-            </TabsList>
-            <TabsContent value="all" className="mt-6 space-y-8">
-              {standardCards.length > 0 ? (
-                standardCards.map(card => (
+        <div className="lg:col-span-6 space-y-6">
+           <div className="space-y-8 mt-4">
+              {allCards.length > 0 ? (
+                allCards.map(card => (
                   <div key={card.id} className="flex flex-col items-center gap-4">
                     <VirtualCard 
                       cardHolder={card.cardHolder}
@@ -137,46 +174,29 @@ export default function CardsPage() {
                       expiryDate={card.expiryDate}
                       cvv={card.cvv}
                       isFrozen={card.isFrozen}
+                      type={card.type as CardStyleType}
                     />
                     <div className="flex gap-2 w-full max-w-sm">
-                      <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={() => toggleFreeze(card)}>
-                        <Power size={14} /> {card.isFrozen ? t.cards.unfreeze : t.cards.freeze}
+                      <Button variant="outline" size="sm" className="flex-1 gap-2 border-white/10 hover:bg-white/5" onClick={() => toggleFreeze(card)}>
+                        <Power size={14} className={card.isFrozen ? "text-emerald-400" : "text-amber-400"} /> 
+                        {card.isFrozen ? t.cards.unfreeze : t.cards.freeze}
                       </Button>
-                      <Button variant="outline" size="sm" className="flex-1 gap-2 text-destructive" onClick={() => deleteCard(card.id)}>
+                      <Button variant="outline" size="sm" className="flex-1 gap-2 border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-300" onClick={() => deleteCard(card.id)}>
                         <Trash2 size={14} /> {t.common.delete}
                       </Button>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-center p-12 border-2 border-dashed rounded-2xl border-white/5">
+                <div className="text-center p-12 border-2 border-dashed rounded-2xl border-white/5 bg-white/5">
                   <p className="text-muted-foreground">{t.cards.no_cards}</p>
                 </div>
               )}
-            </TabsContent>
-            <TabsContent value="disposable" className="mt-6">
-              {disposableCards.length > 0 ? (
-                disposableCards.map(card => (
-                  <VirtualCard 
-                    key={card.id}
-                    cardHolder={card.cardHolder}
-                    cardNumber={card.cardNumber}
-                    expiryDate={card.expiryDate}
-                    cvv={card.cvv}
-                    type="disposable"
-                  />
-                ))
-              ) : (
-                <div className="text-center p-12 border-2 border-dashed rounded-2xl border-white/5">
-                  <p className="text-muted-foreground">{t.cards.no_disp_cards}</p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
+           </div>
         </div>
 
-        <div className="lg:col-span-7 space-y-6">
-          <Card className="glass border-primary/5">
+        <div className="lg:col-span-6 space-y-6">
+          <Card className="glass border-primary/5 sticky top-8">
             <CardHeader>
               <div className="flex items-center gap-2 mb-1">
                 <Sliders className="text-primary" size={20} />
