@@ -174,6 +174,7 @@ export default function LoginPage() {
                   expiryDate="12/28" 
                   cvv="123" 
                   type="customized-cash" 
+                  showNumbersOnFront={false}
                   interactive={false}
                 />
               </div>
@@ -196,6 +197,7 @@ export default function LoginPage() {
                   expiryDate="08/27" 
                   cvv="456" 
                   type="unlimited-cash" 
+                  showNumbersOnFront={false}
                   interactive={false}
                 />
               </div>
@@ -218,6 +220,7 @@ export default function LoginPage() {
                   expiryDate="11/29" 
                   cvv="789" 
                   type="travel-rewards" 
+                  showNumbersOnFront={false}
                   interactive={false}
                 />
               </div>
@@ -240,6 +243,7 @@ export default function LoginPage() {
                   expiryDate="05/26" 
                   cvv="012" 
                   type="bankamericard" 
+                  showNumbersOnFront={false}
                   interactive={false}
                 />
               </div>

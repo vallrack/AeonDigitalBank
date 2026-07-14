@@ -26,6 +26,7 @@ export default function CardsPage() {
   const [limit, setLimit] = useState([1500]);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<CardStyleType>('customized-cash');
+  const [selectedVariant, setSelectedVariant] = useState<'standard'|'fifa'>('standard');
 
   const cardsQuery = useMemo(() => {
     if (!user) return null;
@@ -51,6 +52,7 @@ export default function CardsPage() {
         cvv: randomCvv,
         isFrozen: false,
         type: selectedType,
+        variant: (selectedType === 'customized-cash' || selectedType === 'unlimited-cash') ? selectedVariant : 'standard',
         createdAt: new Date().toISOString()
       });
 
@@ -122,25 +124,24 @@ export default function CardsPage() {
               {t.cards.create_card}
             </Button>
           </DialogTrigger>
-          <DialogContent className="glass border-white/10 sm:max-w-[425px]">
+          <DialogContent className="glass border-white/10 sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="font-headline text-xl">Crear Tarjeta Virtual</DialogTitle>
               <DialogDescription>Elige el modelo de tarjeta que prefieras.</DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-6">
-              <div className="flex justify-center">
-                <VirtualCard 
-                  cardHolder={(user?.displayName || "VALUED CUSTOMER").toUpperCase()}
-                  cardNumber="•••• •••• •••• 1234"
-                  expiryDate="12/28"
-                  cvv="***"
-                  type={selectedType}
-                  interactive={false}
-                />
-              </div>
+              
               <div className="space-y-2">
                 <Label>Modelo de Tarjeta</Label>
-                <Select value={selectedType} onValueChange={(val: CardStyleType) => setSelectedType(val)}>
+                <Select 
+                  value={selectedType} 
+                  onValueChange={(val: CardStyleType) => {
+                    setSelectedType(val);
+                    if (val !== 'customized-cash' && val !== 'unlimited-cash') {
+                      setSelectedVariant('standard');
+                    }
+                  }}
+                >
                   <SelectTrigger className="bg-background/50 border-white/10">
                     <SelectValue />
                   </SelectTrigger>
@@ -152,6 +153,74 @@ export default function CardsPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Selector de variante (solo para rojo y gris) */}
+              {(selectedType === 'customized-cash' || selectedType === 'unlimited-cash') ? (
+                <div className="space-y-2 mt-4">
+                  <Label>Seleccione el diseño de su tarjeta *</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                     <div 
+                       className={cn("border rounded-xl p-4 cursor-pointer flex flex-col gap-2 relative bg-white/5 hover:bg-white/10 transition-colors", selectedVariant === 'standard' ? "border-[#1d4ed8] ring-1 ring-[#1d4ed8]" : "border-white/10")}
+                       onClick={() => setSelectedVariant('standard')}
+                     >
+                       <div className="flex items-center gap-3 mb-2">
+                         <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0", selectedVariant === 'standard' ? "border-[#1d4ed8]" : "border-gray-400")}>
+                           {selectedVariant === 'standard' && <div className="w-2.5 h-2.5 bg-[#1d4ed8] rounded-full" />}
+                         </div>
+                         <span className="font-semibold text-sm">Bank of America®</span>
+                       </div>
+                       <VirtualCard 
+                          cardHolder={(user?.displayName || "VALUED CUSTOMER").toUpperCase()}
+                          cardNumber="•••• •••• •••• 1234"
+                          expiryDate="12/28"
+                          cvv="***"
+                          type={selectedType}
+                          variant="standard"
+                          showNumbersOnFront={false}
+                          interactive={false}
+                          className="w-full pointer-events-none"
+                       />
+                     </div>
+
+                     <div 
+                       className={cn("border rounded-xl p-4 cursor-pointer flex flex-col gap-2 relative bg-white/5 hover:bg-white/10 transition-colors", selectedVariant === 'fifa' ? "border-[#1d4ed8] ring-1 ring-[#1d4ed8]" : "border-white/10")}
+                       onClick={() => setSelectedVariant('fifa')}
+                     >
+                       <div className="flex items-center gap-3 mb-2">
+                         <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0", selectedVariant === 'fifa' ? "border-[#1d4ed8]" : "border-gray-400")}>
+                           {selectedVariant === 'fifa' && <div className="w-2.5 h-2.5 bg-[#1d4ed8] rounded-full" />}
+                         </div>
+                         <span className="font-semibold text-sm">Copa Mundial de la FIFA 2026™</span>
+                       </div>
+                       <VirtualCard 
+                          cardHolder={(user?.displayName || "VALUED CUSTOMER").toUpperCase()}
+                          cardNumber="•••• •••• •••• 1234"
+                          expiryDate="12/28"
+                          cvv="***"
+                          type={selectedType}
+                          variant="fifa"
+                          showNumbersOnFront={false}
+                          interactive={false}
+                          className="w-full pointer-events-none"
+                       />
+                       <span className="text-xs text-muted-foreground text-center mt-2">Solo estará disponible hasta el 31 de julio de 2026</span>
+                     </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-center mt-4">
+                  <VirtualCard 
+                    cardHolder={(user?.displayName || "VALUED CUSTOMER").toUpperCase()}
+                    cardNumber="•••• •••• •••• 1234"
+                    expiryDate="12/28"
+                    cvv="***"
+                    type={selectedType}
+                    variant="standard"
+                    showNumbersOnFront={false}
+                    interactive={false}
+                  />
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button onClick={handleCreateCard} className="w-full glow-indigo" disabled={isCreating}>
@@ -175,6 +244,8 @@ export default function CardsPage() {
                       cvv={card.cvv}
                       isFrozen={card.isFrozen}
                       type={card.type as CardStyleType}
+                      variant={card.variant as 'standard' | 'fifa' || 'standard'}
+                      showNumbersOnFront={true}
                     />
                     <div className="flex gap-2 w-full max-w-sm">
                       <Button variant="outline" size="sm" className="flex-1 gap-2 border-white/10 hover:bg-white/5" onClick={() => toggleFreeze(card)}>
