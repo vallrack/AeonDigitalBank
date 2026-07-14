@@ -26,7 +26,7 @@ import { collection, query, orderBy, limit, doc } from 'firebase/firestore';
 
 export default function DashboardPage() {
   const { user, loading: userLoading } = useUser();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const db = useFirestore();
 
   const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
@@ -161,52 +161,56 @@ export default function DashboardPage() {
             ) : recentTransactions.length === 0 ? (
               <div className="text-center p-8 text-muted-foreground">{t.dashboard.no_tx}</div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border/50 hover:bg-transparent">
-                    <TableHead className="text-xs uppercase tracking-wider font-semibold">Concept / Recipient</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wider font-semibold">Category</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wider font-semibold text-right">Amount</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wider font-semibold">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentTransactions.map((tx: any) => (
-                    <TableRow key={tx.id} className="border-border/30 hover:bg-muted/30">
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                          <span className="text-sm">{tx.merchant}</span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-[9px] font-normal py-0">
-                          {tx.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className={cn(
-                        "text-right font-headline font-semibold",
-                        tx.type === 'expense' ? "text-rose-400" : "text-emerald-400"
-                      )}>
-                        <PrivacyMask>
-                          {tx.type === 'expense' ? '-' : '+'}${ (Number(Math.abs(tx.amount)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-                        </PrivacyMask>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <div className={cn(
-                            "w-1.5 h-1.5 rounded-full",
-                            tx.status === 'Completed' ? "bg-emerald-400" : "bg-amber-400"
-                          )} />
-                          <span className="text-[10px] uppercase font-bold">{tx.status}</span>
-                        </div>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[500px]">
+                  <TableHeader>
+                    <TableRow className="border-border/50 hover:bg-transparent">
+                      <TableHead className="text-xs uppercase tracking-wider font-semibold">{t.dashboard.concept_recipient}</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider font-semibold">{t.dashboard.category}</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider font-semibold text-right">{t.dashboard.amount}</TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider font-semibold">{t.dashboard.status_col}</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {recentTransactions.map((tx: any) => (
+                      <TableRow key={tx.id} className="border-border/30 hover:bg-muted/30">
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span className="text-sm">{tx.merchant}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {tx.date ? new Date(tx.date).toLocaleDateString() : 'N/A'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-[9px] font-normal py-0">
+                            {tx.category}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={cn(
+                          "text-right font-headline font-semibold",
+                          tx.type === 'expense' ? "text-rose-400" : "text-emerald-400"
+                        )}>
+                          <PrivacyMask>
+                            {tx.type === 'expense' ? '-' : '+'}${ (Number(Math.abs(tx.amount)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+                          </PrivacyMask>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <div className={cn(
+                              "w-1.5 h-1.5 rounded-full",
+                              tx.status === 'Completed' ? "bg-emerald-400" : "bg-amber-400"
+                            )} />
+                            <span className="text-[10px] uppercase font-bold">
+                              {tx.status === 'Completed' ? (language === 'es' ? 'Completada' : 'Completed') : (language === 'es' ? 'Pendiente' : 'Pending')}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

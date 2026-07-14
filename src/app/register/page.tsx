@@ -67,8 +67,8 @@ export default function RegisterPage() {
     } catch (err) {
       toast({
         variant: "destructive",
-        title: "Error de Cámara",
-        description: "No se pudo acceder a la cámara. Por favor permite los permisos."
+        title: t.common.error,
+        description: t.auth.reg_err_cam
       });
       setIsCameraActive(false);
     }
@@ -94,11 +94,11 @@ export default function RegisterPage() {
 
   const handleNext = () => {
     if (step === 1 && (!formData.email || !formData.password || !formData.fullName)) {
-      toast({ variant: "destructive", title: "Faltan datos", description: "Nombre, email y clave son obligatorios." });
+      toast({ variant: "destructive", title: t.common.error, description: t.auth.reg_err_missing });
       return;
     }
     if (step === 2 && (!idPhoto || !facePhoto)) {
-      toast({ variant: "destructive", title: "Documentos requeridos", description: "Debes subir tu ID y una selfie para continuar." });
+      toast({ variant: "destructive", title: t.common.error, description: t.auth.reg_err_docs });
       return;
     }
     setStep(step + 1);
@@ -127,23 +127,23 @@ export default function RegisterPage() {
       const isAdmin = formData.email === 'vallrack67@gmail.com';
 
       toast({
-        title: isAdmin ? "Súper Admin Activado" : "Cuenta Activada",
-        description: "Bienvenido al futuro de la banca digital Aeon. Creando entorno seguro...",
+        title: isAdmin ? t.common.admin_mode : t.auth.reg_success_title,
+        description: t.auth.reg_finish_info,
       });
 
       setStep(4);
     } catch (error: any) {
       console.error("Registration error:", error);
       
-      let errorMessage = "No se pudo completar la activación de la cuenta.";
+      let errorMessage = t.auth.reg_err_general;
       
       if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "Este correo ya está registrado. Por favor, intenta iniciar sesión.";
+        errorMessage = t.auth.reg_err_in_use;
       }
 
       toast({
         variant: "destructive",
-        title: "Error de Registro",
+        title: t.common.error,
         description: errorMessage,
       });
     } finally {
@@ -183,33 +183,33 @@ export default function RegisterPage() {
         {step === 1 && (
           <Card className="glass border-white/5 animate-in fade-in slide-in-from-right-4">
             <CardHeader>
-              <CardTitle className="text-2xl font-headline font-bold">Datos Personales</CardTitle>
-              <CardDescription>Comencemos con tu información básica.</CardDescription>
+              <CardTitle className="text-2xl font-headline font-bold">{t.auth.reg_personal_title}</CardTitle>
+              <CardDescription>{t.auth.reg_personal_desc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Nombre Completo</Label>
+                <Label htmlFor="fullName">{t.auth.reg_fullname}</Label>
                 <Input 
                   id="fullName" 
-                  placeholder="Ej. Juan Pérez" 
+                  placeholder={t.auth.reg_fullname_ph} 
                   className="bg-white/5 border-white/10"
                   value={formData.fullName}
                   onChange={(e) => setFormData({...formData, fullName: e.target.value})}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Correo Electrónico</Label>
+                <Label htmlFor="email">{t.auth.email}</Label>
                 <Input 
                   id="email" 
                   type="email" 
-                  placeholder="tu@email.com" 
+                  placeholder={t.auth.email_ph} 
                   className="bg-white/5 border-white/10"
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
+                <Label htmlFor="password">{t.auth.password}</Label>
                 <Input 
                   id="password" 
                   type="password" 
@@ -231,13 +231,13 @@ export default function RegisterPage() {
         {step === 2 && (
           <Card className="glass border-white/5 animate-in fade-in slide-in-from-right-4">
             <CardHeader>
-              <CardTitle className="text-2xl font-headline font-bold">Documentación</CardTitle>
-              <CardDescription>Sube tu ID (Imagen o PDF) y captura una selfie.</CardDescription>
+              <CardTitle className="text-2xl font-headline font-bold">{t.auth.reg_docs_title}</CardTitle>
+              <CardDescription>{t.auth.reg_docs_desc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Documento de Identidad (ID/Pasaporte)</Label>
+                  <Label>{t.auth.reg_id_doc}</Label>
                   <div 
                     onClick={() => idInputRef.current?.click()}
                     className={cn(
@@ -255,19 +255,19 @@ export default function RegisterPage() {
                     {idPhoto ? (
                       <div className="flex flex-col items-center gap-2">
                         <CheckCircle className="text-emerald-500" size={32} />
-                        <span className="text-sm text-emerald-500 font-bold">Documento Cargado</span>
+                        <span className="text-sm text-emerald-500 font-bold">{t.auth.reg_id_uploaded}</span>
                       </div>
                     ) : (
                       <>
                         <FileText className="text-muted-foreground mb-2" size={32} />
-                        <p className="text-xs text-muted-foreground font-medium">Sube tu ID o PDF</p>
+                        <p className="text-xs text-muted-foreground font-medium">{t.auth.reg_id_upload}</p>
                       </>
                     )}
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Selfie de Verificación</Label>
+                  <Label>{t.auth.reg_selfie}</Label>
                   <div className={cn(
                     "border-2 border-dashed rounded-2xl overflow-hidden flex flex-col items-center justify-center text-center transition-all min-h-[160px]",
                     facePhoto ? "border-emerald-500 bg-emerald-500/5" : "border-white/10 bg-white/5"
@@ -280,9 +280,9 @@ export default function RegisterPage() {
                           playsInline 
                           className="w-full h-full object-cover"
                         />
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col sm:flex-row gap-2 w-[90%] sm:w-auto justify-center">
                           <Button size="sm" onClick={takePhoto} className="glow-indigo rounded-full">
-                            Capturar Foto
+                            {t.auth.reg_selfie_capture}
                           </Button>
                           <Button size="sm" variant="destructive" onClick={() => setIsCameraActive(false)} className="rounded-full">
                             {t.common.cancel}
@@ -292,22 +292,22 @@ export default function RegisterPage() {
                     ) : facePhoto ? (
                       <div className="relative w-full h-full flex flex-col items-center justify-center p-4">
                         <img src={facePhoto} alt="Selfie" className="w-32 h-32 rounded-full object-cover border-2 border-emerald-500 mb-2" />
-                        <span className="text-sm text-emerald-500 font-bold">Selfie Capturada</span>
+                        <span className="text-sm text-emerald-500 font-bold">{t.auth.reg_selfie_done}</span>
                         <Button 
                           variant="ghost" 
                           size="sm" 
                           className="mt-2 text-muted-foreground hover:text-white"
                           onClick={startCamera}
                         >
-                          <RefreshCw size={14} className="mr-2" /> Re-tomar Foto
+                          <RefreshCw size={14} className="mr-2" /> {t.auth.reg_selfie_retake}
                         </Button>
                       </div>
                     ) : (
                       <div className="p-6 flex flex-col items-center justify-center">
                         <Camera className="text-muted-foreground mb-2" size={32} />
-                        <p className="text-xs text-muted-foreground mb-4 font-medium">Captura tu rostro en vivo</p>
+                        <p className="text-xs text-muted-foreground mb-4 font-medium">{t.auth.reg_selfie_desc}</p>
                         <Button size="sm" variant="outline" onClick={startCamera}>
-                          <Camera className="mr-2" size={16} /> Abrir Cámara
+                          <Camera className="mr-2" size={16} /> {t.auth.reg_selfie_open}
                         </Button>
                       </div>
                     )}
@@ -331,12 +331,12 @@ export default function RegisterPage() {
                   <Shield className="text-primary" size={48} />
                 </div>
               </div>
-              <CardTitle className="text-2xl font-headline font-bold">Finalizar Registro</CardTitle>
-              <CardDescription>Tus documentos han sido cargados correctamente.</CardDescription>
+              <CardTitle className="text-2xl font-headline font-bold">{t.auth.reg_finish_title}</CardTitle>
+              <CardDescription>{t.auth.reg_finish_desc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                <div className="text-sm text-center text-muted-foreground bg-white/5 p-4 rounded-xl border border-white/5">
-                 Al finalizar, activaremos tu cuenta bancaria de alta precisión. Podrás acceder de inmediato a tu saldo inicial y tarjeta virtual.
+                 {t.auth.reg_finish_info}
                </div>
             </CardContent>
             <CardFooter>
@@ -348,10 +348,10 @@ export default function RegisterPage() {
                 {isVerifying ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Activando Cuenta...
+                    {t.auth.reg_activating}
                   </>
                 ) : (
-                  "Finalizar y Activar Cuenta"
+                  t.auth.reg_finish_btn
                 )}
               </Button>
             </CardFooter>
@@ -364,15 +364,15 @@ export default function RegisterPage() {
               <div className="w-20 h-20 bg-emerald-400/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="text-emerald-400" size={40} />
               </div>
-              <CardTitle className="text-3xl font-headline font-bold">¡Bienvenido!</CardTitle>
-              <CardDescription className="text-lg">Tu cuenta Aeon está activa y verificada.</CardDescription>
+              <CardTitle className="text-3xl font-headline font-bold">{t.auth.reg_success_title}</CardTitle>
+              <CardDescription className="text-lg">{t.auth.reg_success_desc}</CardDescription>
             </CardHeader>
             <CardContent className="text-center p-8">
               <p className="text-muted-foreground mb-8">
-                Hemos asignado un saldo inicial de <strong>$5,000.00</strong> y generado tu primera tarjeta virtual.
+                {t.auth.reg_success_info}
               </p>
               <Button className="w-full h-14 text-lg glow-indigo font-headline" asChild>
-                <Link href="/login">Acceder a mi Dashboard</Link>
+                <Link href="/login">{t.auth.reg_access_btn}</Link>
               </Button>
             </CardContent>
           </Card>

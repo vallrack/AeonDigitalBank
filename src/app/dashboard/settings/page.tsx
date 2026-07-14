@@ -25,10 +25,12 @@ import { toast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function SettingsPage() {
   const { user } = useUser();
   const db = useFirestore();
+  const { t } = useI18n();
   const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
   const { data: userData, loading } = useDoc(userRef);
 
@@ -46,9 +48,9 @@ export default function SettingsPage() {
       await updateDoc(doc(db, 'users', user.uid), {
         fullName: name
       });
-      toast({ title: "Profile updated", description: "Your information has been saved." });
+      toast({ title: t.settings.success_profile, description: t.settings.success_profile_desc });
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Could not update profile." });
+      toast({ variant: "destructive", title: t.common.error, description: t.settings.err_profile });
     } finally {
       setIsSaving(false);
     }
@@ -59,16 +61,16 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div>
-        <h1 className="text-3xl font-headline font-bold">Settings</h1>
-        <p className="text-muted-foreground">Configure your profile, notifications, and preferences.</p>
+        <h1 className="text-3xl font-headline font-bold">{t.settings.title}</h1>
+        <p className="text-muted-foreground">{t.settings.subtitle}</p>
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
         <TabsList className="bg-muted/30 border border-white/5 p-1">
-          <TabsTrigger value="profile" className="gap-2"><User size={14} /> Profile</TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2"><Bell size={14} /> Notifications</TabsTrigger>
-          <TabsTrigger value="regional" className="gap-2"><Globe size={14} /> Regional</TabsTrigger>
-          <TabsTrigger value="appearance" className="gap-2"><Palette size={14} /> Appearance</TabsTrigger>
+          <TabsTrigger value="profile" className="gap-2"><User size={14} /> {t.settings.profile_tab}</TabsTrigger>
+          <TabsTrigger value="notifications" className="gap-2"><Bell size={14} /> {t.settings.notif_tab}</TabsTrigger>
+          <TabsTrigger value="regional" className="gap-2"><Globe size={14} /> {t.settings.regional_tab}</TabsTrigger>
+          <TabsTrigger value="appearance" className="gap-2"><Palette size={14} /> {t.settings.appear_tab}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="mt-8">
@@ -84,19 +86,19 @@ export default function SettingsPage() {
                 <div className="mt-4 flex justify-center">
                   <Badge variant={userData?.role === 'admin' ? "default" : "secondary"} className="gap-1 px-3">
                     <ShieldCheck size={12} />
-                    {userData?.role === 'admin' ? "Administrator" : "Client User"}
+                    {userData?.role === 'admin' ? t.settings.admin : t.settings.client}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-col gap-1">
-                  <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-widest">Client Since</span>
+                  <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-widest">{t.settings.client_since}</span>
                   <span className="text-sm font-medium">
                     {userData?.createdAt?.toDate ? userData.createdAt.toDate().toLocaleDateString() : 'Dec 2024'}
                   </span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-widest">Account ID</span>
+                  <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-widest">{t.settings.acc_id}</span>
                   <span className="text-xs font-code opacity-50 truncate">{user?.uid}</span>
                 </div>
               </CardContent>
@@ -104,12 +106,12 @@ export default function SettingsPage() {
 
             <Card className="lg:col-span-2 glass border-primary/5">
               <CardHeader>
-                <CardTitle className="text-xl font-headline font-bold">Profile Details</CardTitle>
-                <CardDescription>Basic information that will be visible in receipts and statements.</CardDescription>
+                <CardTitle className="text-xl font-headline font-bold">{t.settings.profile_details}</CardTitle>
+                <CardDescription>{t.settings.profile_desc}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="full-name">Full Legal Name</Label>
+                  <Label htmlFor="full-name">{t.settings.full_name}</Label>
                   <Input 
                     id="full-name" 
                     className="bg-white/5 border-white/10"
@@ -118,7 +120,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address (Read-only)</Label>
+                  <Label htmlFor="email">{t.settings.email_read}</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input 
@@ -130,7 +132,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="phone">{t.settings.phone}</Label>
                   <Input 
                     id="phone" 
                     placeholder="+34 600 000 000" 
@@ -141,7 +143,7 @@ export default function SettingsPage() {
               <CardFooter className="border-t border-white/5 pt-6 mt-4">
                 <Button className="ml-auto glow-indigo" onClick={handleUpdateProfile} disabled={isSaving}>
                   {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Check size={16} className="mr-2" />}
-                  Save Profile
+                  {t.settings.save_profile}
                 </Button>
               </CardFooter>
             </Card>

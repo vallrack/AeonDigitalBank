@@ -259,12 +259,12 @@ export default function AdminUsersPage() {
           <DialogContent className="glass border-white/10 sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle className="font-headline text-xl">{t.admin.add_client}</DialogTitle>
-              <DialogDescription>Create a new account with an initial balance.</DialogDescription>
+              <DialogDescription>{t.admin.create_account_desc}</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleCreateClient}>
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
-                  <Label>Full Name</Label>
+                  <Label>{t.admin.full_name}</Label>
                   <Input 
                     value={newUserData.fullName}
                     onChange={(e) => setNewUserData({...newUserData, fullName: e.target.value})}
@@ -272,7 +272,7 @@ export default function AdminUsersPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label>{t.admin.email}</Label>
                   <Input 
                     type="email"
                     value={newUserData.email}
@@ -281,7 +281,7 @@ export default function AdminUsersPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Password</Label>
+                  <Label>{t.admin.password}</Label>
                   <Input 
                     type="password"
                     value={newUserData.password}
@@ -319,7 +319,7 @@ export default function AdminUsersPage() {
         <Card className="glass border-white/5">
           <CardHeader>
             <CardTitle>{users.filter(u => u.role === 'admin').length}</CardTitle>
-            <CardDescription>Admins</CardDescription>
+            <CardDescription>{t.admin.admins}</CardDescription>
           </CardHeader>
         </Card>
         <Card className="glass border-white/5 sm:col-span-2 md:col-span-1">
@@ -353,9 +353,9 @@ export default function AdminUsersPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="border-white/5">
-                    <TableHead>User</TableHead>
-                    <TableHead className="hidden md:table-cell">Email</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead>{t.admin.col_user}</TableHead>
+                    <TableHead className="hidden md:table-cell">{t.admin.col_email}</TableHead>
+                    <TableHead className="text-right">{t.admin.col_balance}</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -413,11 +413,11 @@ export default function AdminUsersPage() {
           {selectedUser && (
             <form onSubmit={handleUpdateUser} className="space-y-4">
               <div className="space-y-2">
-                <Label>Name</Label>
+                <Label>{t.admin.name}</Label>
                 <Input value={selectedUser.fullName} onChange={e => setSelectedUser({...selectedUser, fullName: e.target.value})} />
               </div>
               <div className="space-y-2">
-                <Label>Balance ($)</Label>
+                <Label>{t.admin.balance}</Label>
                 <Input type="number" value={selectedUser.balance} onChange={e => setSelectedUser({...selectedUser, balance: e.target.value})} />
               </div>
               <DialogFooter><Button type="submit" disabled={isProcessing}>{t.common.save}</Button></DialogFooter>
@@ -437,12 +437,12 @@ export default function AdminUsersPage() {
         <DialogContent className="glass border-white/10 sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>{t.admin.deposit}</DialogTitle>
-            <DialogDescription>Add balance to {selectedUser?.fullName}'s account.</DialogDescription>
+            <DialogDescription>{t.admin.add_balance} {selectedUser?.fullName}.</DialogDescription>
           </DialogHeader>
           {selectedUser && (
             <form onSubmit={handleDeposit} className="space-y-4">
               <div className="space-y-2">
-                <Label>Amount (USD)</Label>
+                <Label>{t.admin.amount_usd}</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
                   <Input 

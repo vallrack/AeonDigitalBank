@@ -17,10 +17,12 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function TransfersPage() {
   const { user } = useUser();
   const db = useFirestore();
+  const { t } = useI18n();
   const userRef = useMemo(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
   const { data: userData } = useDoc(userRef);
   
@@ -47,8 +49,8 @@ export default function TransfersPage() {
       if (foundUser.uid === user?.uid) {
         toast({ 
           variant: "destructive", 
-          title: "Operación no válida", 
-          description: "No puedes realizar transferencias a tu propia cuenta." 
+          title: t.common.error, 
+          description: t.transfers.search_err_self 
         });
       } else {
         setRecipientUser(foundUser);
@@ -57,8 +59,8 @@ export default function TransfersPage() {
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Destinatario no encontrado",
-        description: "Verifica que el email o número de tarjeta pertenezca a la Red AEON."
+        title: t.common.error,
+        description: t.transfers.search_err_not_found
       });
     } finally {
       setIsProcessing(false);
@@ -85,12 +87,12 @@ export default function TransfersPage() {
   const handleTransferInit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || parseFloat(amount) <= 0) {
-      toast({ variant: "destructive", title: "Monto requerido" });
+      toast({ variant: "destructive", title: t.common.error, description: t.transfers.err_amount_req });
       return;
     }
 
     if (parseFloat(amount) > (userData?.balance || 0)) {
-      toast({ variant: "destructive", title: "Saldo insuficiente" });
+      toast({ variant: "destructive", title: t.common.error, description: t.transfers.err_insufficient });
       return;
     }
 
@@ -139,12 +141,12 @@ export default function TransfersPage() {
       });
 
       setStep(4);
-      toast({ title: "Transferencia Exitosa" });
+      toast({ title: t.transfers.success_title });
     } catch (error: any) {
       toast({ 
         variant: "destructive", 
-        title: "Error en la transacción", 
-        description: error.message || "No se pudo procesar la transferencia."
+        title: t.common.error, 
+        description: error.message || t.transfers.err_general
       });
     } finally {
       setIsProcessing(false);
@@ -154,8 +156,8 @@ export default function TransfersPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-headline font-bold">Transferencia de Fondos</h1>
-        <p className="text-muted-foreground">Ecosistema de pagos internos AEON Network.</p>
+        <h1 className="text-3xl font-headline font-bold">{t.transfers.title}</h1>
+        <p className="text-muted-foreground">{t.transfers.subtitle}</p>
       </div>
 
       {step === 1 && (
@@ -163,18 +165,18 @@ export default function TransfersPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
               <Search className="text-primary" size={20} />
-              Buscar Destinatario
+              {t.transfers.search_title}
             </CardTitle>
-            <CardDescription>Ingresa el email o número de tarjeta AEON del receptor.</CardDescription>
+            <CardDescription>{t.transfers.search_desc}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="search">Identificador del Cliente</Label>
+              <Label htmlFor="search">{t.transfers.search_label}</Label>
               <div className="relative">
                 <CreditCard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input 
                   id="search" 
-                  placeholder="Email o número de tarjeta AEON" 
+                  placeholder={t.transfers.search_ph} 
                   className="pl-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -183,15 +185,15 @@ export default function TransfersPage() {
               </div>
             </div>
             <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
-              <p className="text-[10px] text-primary font-bold uppercase tracking-widest mb-1">Nota de Seguridad</p>
+              <p className="text-[10px] text-primary font-bold uppercase tracking-widest mb-1">{t.transfers.search_note_title}</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Solo se permiten movimientos entre cuentas activas dentro del sistema de alta precisión AEON Digital.
+                {t.transfers.search_note_desc}
               </p>
             </div>
           </CardContent>
           <CardFooter>
             <Button className="w-full glow-indigo" onClick={findRecipient} disabled={isProcessing || !searchQuery}>
-              {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Validar Destinatario"}
+              {isProcessing ? <Loader2 className="animate-spin mr-2" /> : t.transfers.search_btn}
             </Button>
           </CardFooter>
         </Card>
@@ -208,7 +210,7 @@ export default function TransfersPage() {
                 <CardTitle className="text-lg">{recipientUser?.fullName}</CardTitle>
                 <CardDescription className="flex items-center gap-2">
                   <ShieldCheck size={12} className="text-emerald-400" />
-                  Red de Confianza AEON
+                  {t.transfers.trusted_network}
                 </CardDescription>
               </div>
             </div>
@@ -216,7 +218,7 @@ export default function TransfersPage() {
           <form onSubmit={handleTransferInit}>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="amount">Monto a Enviar (USD)</Label>
+                <Label htmlFor="amount">{t.transfers.amount_label}</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
                   <Input 
@@ -230,16 +232,16 @@ export default function TransfersPage() {
                   />
                 </div>
                 <div className="flex justify-between text-[10px] text-muted-foreground">
-                  <span>Tu saldo: ${(userData?.balance || 0).toLocaleString()}</span>
-                  <span>Sin comisiones bancarias</span>
+                  <span>{t.transfers.amount_balance} ${(userData?.balance || 0).toLocaleString()}</span>
+                  <span>{t.transfers.amount_no_fees}</span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reference">Referencia / Concepto</Label>
+                <Label htmlFor="reference">{t.transfers.ref_label}</Label>
                 <Textarea 
                   id="reference" 
-                  placeholder="¿Cuál es el motivo del envío?" 
+                  placeholder={t.transfers.ref_ph} 
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
                   onBlur={handleRefBlur}
@@ -250,15 +252,15 @@ export default function TransfersPage() {
                     isAiLoading ? "bg-muted animate-pulse" : "bg-accent/20 text-accent"
                   )}>
                     {isAiLoading ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-                    Categorización IA: {aiCategory}
+                    {t.transfers.ai_category} {aiCategory}
                   </div>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="flex gap-4">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Atrás</Button>
+              <Button variant="outline" type="button" className="flex-1" onClick={() => setStep(1)}>{t.common.back}</Button>
               <Button type="submit" className="flex-1 glow-indigo" disabled={isProcessing}>
-                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Revisar Operación"}
+                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : t.transfers.review_btn}
               </Button>
             </CardFooter>
           </form>
@@ -275,14 +277,14 @@ export default function TransfersPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   {fraudResult?.isSuspicious ? <AlertTriangle className="text-amber-500" /> : <ShieldCheck className="text-emerald-500" />}
-                  Validación de Seguridad
+                  {t.transfers.validation_title}
                 </CardTitle>
                 <span className={cn(
                   "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
                   fraudResult?.alertLevel === 'High' ? "bg-rose-500" : 
                   fraudResult?.alertLevel === 'Medium' ? "bg-amber-500" : "bg-emerald-500"
                 )}>
-                  Nivel de Riesgo: {fraudResult?.alertLevel || 'Nulo'}
+                  {t.transfers.risk_level} {fraudResult?.alertLevel || 'Nulo'}
                 </span>
               </div>
             </CardHeader>
@@ -294,19 +296,19 @@ export default function TransfersPage() {
                   <span className="font-bold">{recipientUser?.fullName}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-white/5">
-                  <span className="text-muted-foreground text-xs">Monto Neto:</span>
+                  <span className="text-muted-foreground text-xs">{t.transfers.net_amount}</span>
                   <span className="font-headline font-bold text-2xl text-accent">${parseFloat(amount).toFixed(2)}</span>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="flex gap-4">
-              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>Editar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>{t.common.edit}</Button>
               <Button 
                 className={cn("flex-1", fraudResult?.isSuspicious ? "bg-amber-500 hover:bg-amber-600" : "glow-indigo")} 
                 onClick={confirmTransfer}
                 disabled={isProcessing}
               >
-                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : "Confirmar Envío"}
+                {isProcessing ? <Loader2 className="animate-spin mr-2" /> : t.transfers.confirm_btn}
               </Button>
             </CardFooter>
           </Card>
@@ -320,9 +322,9 @@ export default function TransfersPage() {
               <CheckCircle2 className="text-emerald-500" size={40} />
             </div>
             <div className="space-y-2">
-              <h2 className="text-2xl font-headline font-bold">Transferencia Exitosa</h2>
+              <h2 className="text-2xl font-headline font-bold">{t.transfers.success_title}</h2>
               <p className="text-muted-foreground">
-                Se han enviado ${parseFloat(amount).toFixed(2)} a {recipientUser?.fullName}. El saldo del receptor ha sido actualizado de inmediato.
+                Se han enviado ${parseFloat(amount).toFixed(2)} a {recipientUser?.fullName}. {t.transfers.success_desc}
               </p>
             </div>
             <Button className="w-full glow-indigo" onClick={() => {
@@ -333,7 +335,7 @@ export default function TransfersPage() {
               setReference('');
               setAiCategory('Transfer');
             }}>
-              Realizar otra transferencia
+              {t.transfers.another_transfer}
             </Button>
           </CardContent>
         </Card>

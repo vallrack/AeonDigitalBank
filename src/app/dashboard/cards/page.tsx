@@ -16,10 +16,12 @@ import { useUser, useFirestore, useCollection } from '@/firebase';
 import { collection, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function CardsPage() {
   const { user, loading: userLoading } = useUser();
   const db = useFirestore();
+  const { t } = useI18n();
   const [isCreating, setIsCreating] = useState(false);
   const [limit, setLimit] = useState([1500]);
 
@@ -48,8 +50,8 @@ export default function CardsPage() {
     addDoc(collection(db, 'users', user.uid, 'virtualCards'), newCard)
       .then(() => {
         toast({
-          title: "Card Created",
-          description: "Your new virtual card is ready to use.",
+          title: t.cards.success_create,
+          description: t.cards.success_create_desc,
         });
       })
       .catch(async (error) => {
@@ -84,7 +86,7 @@ export default function CardsPage() {
     
     deleteDoc(cardRef)
       .then(() => {
-        toast({ title: "Card deleted" });
+        toast({ title: t.cards.success_delete });
       })
       .catch(async () => {
         const permissionError = new FirestorePermissionError({
@@ -106,8 +108,8 @@ export default function CardsPage() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Virtual Cards</h1>
-          <p className="text-muted-foreground">Secure your online purchases with dynamic virtual cards.</p>
+          <h1 className="text-3xl font-headline font-bold">{t.cards.title}</h1>
+          <p className="text-muted-foreground">{t.cards.subtitle}</p>
         </div>
         <Button 
           className="gap-2 glow-indigo" 
@@ -115,7 +117,7 @@ export default function CardsPage() {
           disabled={isCreating}
         >
           {isCreating ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-          Create New Card
+          {t.cards.create_card}
         </Button>
       </div>
 
@@ -123,8 +125,8 @@ export default function CardsPage() {
         <div className="lg:col-span-5 space-y-6">
           <Tabs defaultValue="all" className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-muted/50 border border-border/50">
-              <TabsTrigger value="all">Main Cards ({standardCards.length})</TabsTrigger>
-              <TabsTrigger value="disposable">Disposable ({disposableCards.length})</TabsTrigger>
+              <TabsTrigger value="all">{t.cards.main_cards} ({standardCards.length})</TabsTrigger>
+              <TabsTrigger value="disposable">{t.cards.disposable} ({disposableCards.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="all" className="mt-6 space-y-8">
               {standardCards.length > 0 ? (
@@ -139,17 +141,17 @@ export default function CardsPage() {
                     />
                     <div className="flex gap-2 w-full max-w-sm">
                       <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={() => toggleFreeze(card)}>
-                        <Power size={14} /> {card.isFrozen ? 'Unfreeze' : 'Freeze'}
+                        <Power size={14} /> {card.isFrozen ? t.cards.unfreeze : t.cards.freeze}
                       </Button>
                       <Button variant="outline" size="sm" className="flex-1 gap-2 text-destructive" onClick={() => deleteCard(card.id)}>
-                        <Trash2 size={14} /> Delete
+                        <Trash2 size={14} /> {t.common.delete}
                       </Button>
                     </div>
                   </div>
                 ))
               ) : (
                 <div className="text-center p-12 border-2 border-dashed rounded-2xl border-white/5">
-                  <p className="text-muted-foreground">You don't have any virtual cards yet.</p>
+                  <p className="text-muted-foreground">{t.cards.no_cards}</p>
                 </div>
               )}
             </TabsContent>
@@ -167,7 +169,7 @@ export default function CardsPage() {
                 ))
               ) : (
                 <div className="text-center p-12 border-2 border-dashed rounded-2xl border-white/5">
-                  <p className="text-muted-foreground">No disposable cards available.</p>
+                  <p className="text-muted-foreground">{t.cards.no_disp_cards}</p>
                 </div>
               )}
             </TabsContent>
@@ -179,16 +181,16 @@ export default function CardsPage() {
             <CardHeader>
               <div className="flex items-center gap-2 mb-1">
                 <Sliders className="text-primary" size={20} />
-                <CardTitle className="text-xl font-headline font-bold">Card Management</CardTitle>
+                <CardTitle className="text-xl font-headline font-bold">{t.cards.management}</CardTitle>
               </div>
-              <CardDescription>Configure spending limits and security policies.</CardDescription>
+              <CardDescription>{t.cards.management_desc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
               <div className="space-y-4">
                 <div className="flex justify-between items-end">
                   <div className="space-y-1">
-                    <Label className="text-base">Monthly Spending Limit</Label>
-                    <p className="text-sm text-muted-foreground">Transactions will be declined once limit is reached.</p>
+                    <Label className="text-base">{t.cards.monthly_limit}</Label>
+                    <p className="text-sm text-muted-foreground">{t.cards.limit_desc}</p>
                   </div>
                   <span className="text-2xl font-headline font-bold text-accent">${limit[0].toLocaleString()}</span>
                 </div>
@@ -204,21 +206,21 @@ export default function CardsPage() {
               <div className="space-y-4 pt-6 border-t border-border/50">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label className="text-base">Contactless Payments</Label>
-                    <p className="text-sm text-muted-foreground">Enable NFC payments via mobile wallet.</p>
+                    <Label className="text-base">{t.cards.contactless}</Label>
+                    <p className="text-sm text-muted-foreground">{t.cards.contactless_desc}</p>
                   </div>
                   <Switch defaultChecked />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label className="text-base">International Transactions</Label>
-                    <p className="text-sm text-muted-foreground">Allow transactions outside your home country.</p>
+                    <Label className="text-base">{t.cards.international}</Label>
+                    <p className="text-sm text-muted-foreground">{t.cards.international_desc}</p>
                   </div>
                   <Switch />
                 </div>
               </div>
 
-              <Button className="w-full glow-indigo mt-4">Save Configuration</Button>
+              <Button className="w-full glow-indigo mt-4">{t.cards.save_config}</Button>
             </CardContent>
           </Card>
         </div>

@@ -32,8 +32,8 @@ export default function LoginPage() {
     if (!email || !password) {
       toast({
         variant: "destructive",
-        title: "Campos incompletos",
-        description: "Por favor, introduce tu email y contraseña.",
+        title: t.common.error,
+        description: t.auth.login_err_incomplete,
       });
       return;
     }
@@ -42,25 +42,25 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       toast({
-        title: "Acceso concedido",
-        description: "Bienvenido a Aeon Digital Bank.",
+        title: t.auth.login_success,
+        description: t.auth.login_success_desc,
       });
       router.push('/dashboard');
     } catch (error: any) {
-      let msg = "Credenciales inválidas. Por favor, verifica tus datos.";
+      let msg = t.auth.login_err_invalid;
       
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-        msg = "No encontramos esta cuenta. ¿Ya te has registrado?";
+        msg = t.auth.login_err_not_found;
       } else if (error.code === 'auth/wrong-password') {
-        msg = "La contraseña es incorrecta.";
+        msg = t.auth.login_err_wrong_pwd;
       } else if (error.code === 'auth/invalid-email') {
-        msg = "El formato del email no es válido.";
+        msg = t.auth.login_err_invalid_email;
       }
 
       setErrorMessage(msg);
       toast({
         variant: "destructive",
-        title: "Error de inicio de sesión",
+        title: t.common.error,
         description: msg,
       });
     } finally {
@@ -87,16 +87,16 @@ export default function LoginPage() {
           </div>
         </Link>
         <div className="text-center">
-          <h1 className="text-2xl font-headline font-bold">Sign In to Aeon</h1>
-          <p className="text-muted-foreground">Securely manage your precision finances.</p>
+          <h1 className="text-2xl font-headline font-bold">{t.auth.login_title}</h1>
+          <p className="text-muted-foreground">{t.auth.login_subtitle}</p>
         </div>
       </div>
 
       <Card className="w-full max-w-md glass border-white/5">
         <form onSubmit={handleLogin}>
           <CardHeader>
-            <CardTitle className="text-xl font-headline">Welcome Back</CardTitle>
-            <CardDescription>Enter your credentials to access your account.</CardDescription>
+            <CardTitle className="text-xl font-headline">{t.auth.login_card_title}</CardTitle>
+            <CardDescription>{t.auth.login_card_desc}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {errorMessage && (
@@ -106,11 +106,11 @@ export default function LoginPage() {
               </Alert>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">{t.auth.email}</Label>
               <Input 
                 id="email" 
                 type="email" 
-                placeholder="email@example.com" 
+                placeholder={t.auth.email_ph} 
                 className="bg-white/5 border-white/10" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -119,8 +119,8 @@ export default function LoginPage() {
             </div>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <Label htmlFor="password">Password</Label>
-                <Link href="#" className="text-xs text-primary hover:text-accent">Forgot Password?</Link>
+                <Label htmlFor="password">{t.auth.password}</Label>
+                <Link href="#" className="text-xs text-primary hover:text-accent">{t.auth.forgot_password}</Link>
               </div>
               <div className="relative">
                 <Input 
@@ -150,7 +150,7 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Authenticating...
+                  {t.auth.authenticating}
                 </>
               ) : (
                 <>
@@ -159,7 +159,7 @@ export default function LoginPage() {
               )}
             </Button>
             <div className="text-center text-sm text-muted-foreground">
-              Don't have an account? <Link href="/register" className="text-primary hover:text-accent font-medium">Get Started</Link>
+              {t.auth.no_account} <Link href="/register" className="text-primary hover:text-accent font-medium">{t.common.get_started}</Link>
             </div>
           </CardFooter>
         </form>
@@ -167,7 +167,7 @@ export default function LoginPage() {
 
       <div className="mt-8 flex items-center gap-2 text-xs text-muted-foreground font-headline">
         <Shield size={14} className="text-emerald-400" />
-        BANK-LEVEL SECURITY ENABLED
+        {t.common.bank_security}
       </div>
     </div>
   );

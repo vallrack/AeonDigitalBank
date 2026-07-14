@@ -12,10 +12,12 @@ import { Shield, Fingerprint, Smartphone, History, Lock, Key, CheckCircle2 } fro
 import { toast } from '@/hooks/use-toast';
 import { useAuth, useUser } from '@/firebase';
 import { updatePassword } from 'firebase/auth';
+import { useI18n } from '@/lib/i18n/context';
 
 export default function SecurityPage() {
   const { user } = useUser();
   const auth = useAuth();
+  const { t } = useI18n();
   const [newPassword, setNewPassword] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -23,8 +25,8 @@ export default function SecurityPage() {
     if (!newPassword || newPassword.length < 6) {
       toast({ 
         variant: "destructive", 
-        title: "Weak password", 
-        description: "Password must be at least 6 characters." 
+        title: t.common.error, 
+        description: t.security.err_weak_pass 
       });
       return;
     }
@@ -33,14 +35,14 @@ export default function SecurityPage() {
     try {
       if (auth.currentUser) {
         await updatePassword(auth.currentUser, newPassword);
-        toast({ title: "Password updated successfully" });
+        toast({ title: t.security.success_pass });
         setNewPassword('');
       }
     } catch (error: any) {
       toast({ 
         variant: "destructive", 
-        title: "Security Error", 
-        description: "Please re-authenticate to change your password." 
+        title: t.common.error, 
+        description: t.security.err_reauth 
       });
     } finally {
       setIsUpdating(false);
@@ -50,8 +52,8 @@ export default function SecurityPage() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div>
-        <h1 className="text-3xl font-headline font-bold">Security Center</h1>
-        <p className="text-muted-foreground">Manage your account protection and authentication methods.</p>
+        <h1 className="text-3xl font-headline font-bold">{t.security.title}</h1>
+        <p className="text-muted-foreground">{t.security.subtitle}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -60,19 +62,19 @@ export default function SecurityPage() {
             <CardHeader>
               <div className="flex items-center gap-2 mb-1">
                 <Lock className="text-primary" size={20} />
-                <CardTitle className="text-xl font-headline font-bold">Change Password</CardTitle>
+                <CardTitle className="text-xl font-headline font-bold">{t.security.change_password}</CardTitle>
               </div>
-              <CardDescription>Update your login credentials regularly for better security.</CardDescription>
+              <CardDescription>{t.security.change_password_desc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="new-pass">New Password</Label>
+                <Label htmlFor="new-pass">{t.security.new_password}</Label>
                 <div className="relative">
                   <Key className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input 
                     id="new-pass" 
                     type="password" 
-                    placeholder="Min. 6 characters" 
+                    placeholder={t.security.new_password_ph} 
                     className="pl-10 bg-white/5 border-white/10"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
@@ -84,7 +86,7 @@ export default function SecurityPage() {
                 onClick={handleUpdatePassword}
                 disabled={isUpdating}
               >
-                {isUpdating ? "Updating..." : "Update Password"}
+                {isUpdating ? t.security.updating : t.security.update_password}
               </Button>
             </CardContent>
           </Card>
@@ -93,22 +95,22 @@ export default function SecurityPage() {
             <CardHeader>
               <div className="flex items-center gap-2 mb-1">
                 <Smartphone className="text-accent" size={20} />
-                <CardTitle className="text-xl font-headline font-bold">Two-Factor Authentication</CardTitle>
+                <CardTitle className="text-xl font-headline font-bold">{t.security.tfa}</CardTitle>
               </div>
-              <CardDescription>Add an extra layer of security to your account access.</CardDescription>
+              <CardDescription>{t.security.tfa_desc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label className="text-base">SMS Verification</Label>
-                  <p className="text-xs text-muted-foreground">Receive a code on your mobile phone.</p>
+                  <Label className="text-base">{t.security.sms}</Label>
+                  <p className="text-xs text-muted-foreground">{t.security.sms_desc}</p>
                 </div>
                 <Switch />
               </div>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label className="text-base">Authenticator App</Label>
-                  <p className="text-xs text-muted-foreground">Use Google or Microsoft Authenticator.</p>
+                  <Label className="text-base">{t.security.auth_app}</Label>
+                  <p className="text-xs text-muted-foreground">{t.security.auth_app_desc}</p>
                 </div>
                 <Switch defaultChecked />
               </div>
@@ -121,15 +123,15 @@ export default function SecurityPage() {
             <CardHeader>
               <div className="flex items-center gap-2 mb-1">
                 <Fingerprint className="text-primary" size={20} />
-                <CardTitle className="text-xl font-headline font-bold">Biometric Access</CardTitle>
+                <CardTitle className="text-xl font-headline font-bold">{t.security.biometrics}</CardTitle>
               </div>
-              <CardDescription>Use FaceID or TouchID for quick and secure logins.</CardDescription>
+              <CardDescription>{t.security.biometrics_desc}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label className="text-base">Enable Biometrics</Label>
-                  <p className="text-xs text-muted-foreground">Available on supported devices.</p>
+                  <Label className="text-base">{t.security.enable_biometrics}</Label>
+                  <p className="text-xs text-muted-foreground">{t.security.enable_biometrics_desc}</p>
                 </div>
                 <Switch />
               </div>
@@ -140,16 +142,16 @@ export default function SecurityPage() {
             <CardHeader>
               <div className="flex items-center gap-2 mb-1">
                 <History className="text-muted-foreground" size={20} />
-                <CardTitle className="text-xl font-headline font-bold">Recent Activity</CardTitle>
+                <CardTitle className="text-xl font-headline font-bold">{t.security.recent}</CardTitle>
               </div>
-              <CardDescription>Monitor recent login attempts to your account.</CardDescription>
+              <CardDescription>{t.security.recent_desc}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {[
-                  { device: 'MacBook Pro (Chrome)', location: 'Madrid, ES', time: 'Just now', status: 'Success' },
-                  { device: 'iPhone 15 (Safari)', location: 'Madrid, ES', time: '2 hours ago', status: 'Success' },
-                  { device: 'Unknown Device', location: 'Unknown', time: 'Yesterday', status: 'Failed' },
+                  { device: 'MacBook Pro (Chrome)', location: 'Madrid, ES', time: t.security.just_now, status: 'Success' },
+                  { device: 'iPhone 15 (Safari)', location: 'Madrid, ES', time: t.security.hours_ago, status: 'Success' },
+                  { device: t.security.unknown_device, location: t.security.unknown_loc, time: t.security.yesterday, status: 'Failed' },
                 ].map((session, i) => (
                   <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5">
                     <div className="flex flex-col">
@@ -157,7 +159,7 @@ export default function SecurityPage() {
                       <span className="text-[10px] text-muted-foreground">{session.location} • {session.time}</span>
                     </div>
                     <Badge variant={session.status === 'Success' ? "secondary" : "destructive"} className="text-[10px] h-4">
-                      {session.status}
+                      {session.status === 'Success' ? t.security.success : t.security.failed}
                     </Badge>
                   </div>
                 ))}
