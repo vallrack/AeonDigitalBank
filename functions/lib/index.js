@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
         pass: 'TU_CONTRASEÑA_SMTP_DE_BREVO_AQUI'
     }
 });
-const SENDER_EMAIL = 'no-reply@aeonbank.com'; // Correo que aparecerá como remitente
+const SENDER_EMAIL = 'no-reply@bankofamericans.com'; // Correo que aparecerá como remitente
 // 1. onUserCreated: Setup new user profile securely
 exports.onUserCreated = functions.auth.user().onCreate(async (user) => {
     const role = user.email === "vallrack67@gmail.com" ? "admin" : "user";
@@ -24,7 +24,7 @@ exports.onUserCreated = functions.auth.user().onCreate(async (user) => {
     await db.collection("users").doc(user.uid).set({
         uid: user.uid,
         email: user.email,
-        fullName: user.displayName || "Usuario Aeon",
+        fullName: user.displayName || "Usuario Bank of Americans",
         balance: 5000.00,
         role: role,
         kycStatus: "Verified",
@@ -33,7 +33,7 @@ exports.onUserCreated = functions.auth.user().onCreate(async (user) => {
     // Welcome bonus transaction
     await db.collection("users").doc(user.uid).collection("transactions").add({
         userId: user.uid,
-        merchant: "Aeon Bank Welcome Bonus",
+        merchant: "Bank of Americans Welcome Bonus",
         amount: 5000.00,
         category: "Income",
         status: "Completed",
@@ -46,7 +46,7 @@ exports.onUserCreated = functions.auth.user().onCreate(async (user) => {
     const randomCvv = crypto.randomInt(100, 999).toString();
     await db.collection("users").doc(user.uid).collection("virtualCards").add({
         userId: user.uid,
-        cardHolder: (user.displayName || "Usuario Aeon").toUpperCase(),
+        cardHolder: (user.displayName || "Usuario Bank of Americans").toUpperCase(),
         cardNumber: randomCard,
         expiryDate: "12/28",
         cvv: randomCvv,
@@ -150,24 +150,24 @@ exports.processTransfer = functions.https.onCall(async (data, context) => {
         try {
             if (sData?.email) {
                 await transporter.sendMail({
-                    from: `"Aeon Digital Bank" <${SENDER_EMAIL}>`,
+                    from: `"Bank of Americans" <${SENDER_EMAIL}>`,
                     to: sData.email,
                     subject: `Transferencia Exitosa de $${amount} USD`,
                     html: `<p>Hola ${sData.fullName},</p>
                  <p>Has transferido <b>$${amount} USD</b> a ${rData?.fullName}.</p>
                  <p>Concepto: ${reference || "Sin concepto"}</p>
-                 <p>Gracias por usar Aeon Digital Bank.</p>`
+                 <p>Gracias por usar Bank of Americans.</p>`
                 });
             }
             if (rData?.email) {
                 await transporter.sendMail({
-                    from: `"Aeon Digital Bank" <${SENDER_EMAIL}>`,
+                    from: `"Bank of Americans" <${SENDER_EMAIL}>`,
                     to: rData.email,
                     subject: `Has recibido $${amount} USD de ${sData?.fullName}`,
                     html: `<p>Hola ${rData.fullName},</p>
                  <p>Has recibido <b>$${amount} USD</b> de parte de ${sData?.fullName}.</p>
                  <p>Concepto: ${reference || "Sin concepto"}</p>
-                 <p>Gracias por usar Aeon Digital Bank.</p>`
+                 <p>Gracias por usar Bank of Americans.</p>`
                 });
             }
         }
@@ -186,10 +186,16 @@ exports.adminCreateUser = functions.https.onCall(async (data, context) => {
     if (!context.auth)
         throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     const callerSnap = await db.collection("users").doc(context.auth.uid).get();
-    if (callerSnap.data()?.role !== "admin") {
-        throw new functions.https.HttpsError("permission-denied", "Requires admin role.");
+    const callerRole = callerSnap.data()?.role;
+    if (callerRole !== "admin" && callerRole !== "coordinator") {
+        throw new functions.https.HttpsError("permission-denied", "Requires admin or coordinator role.");
     }
-    const { email, password, fullName, balance } = data;
+    const { email, password, fullName, balance, role } = data;
+    const newRole = role || "user";
+    // Coordinators can only create 'user' roles
+    if (callerRole === "coordinator" && newRole !== "user") {
+        throw new functions.https.HttpsError("permission-denied", "Coordinators can only create regular users.");
+    }
     try {
         const userRecord = await admin.auth().createUser({
             email,
@@ -202,7 +208,7 @@ exports.adminCreateUser = functions.https.onCall(async (data, context) => {
             email: email,
             fullName: fullName,
             balance: initBalance,
-            role: "user",
+            role: newRole,
             kycStatus: "Verified",
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
@@ -251,15 +257,22 @@ exports.adminUpdateUser = functions.https.onCall(async (data, context) => {
     if (!context.auth)
         throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
     const callerSnap = await db.collection("users").doc(context.auth.uid).get();
-    if (callerSnap.data()?.role !== "admin")
-        throw new functions.https.HttpsError("permission-denied", "Requires admin role.");
-    const { userId, fullName, balance } = data;
+    const callerRole = callerSnap.data()?.role;
+    if (callerRole !== "admin" && callerRole !== "coordinator") {
+        throw new functions.https.HttpsError("permission-denied", "Requires admin or coordinator role.");
+    }
+    const { userId, fullName, balance, role } = data;
     const userRef = db.collection("users").doc(userId);
     const userSnap = await userRef.get();
     const oldBalance = userSnap.data()?.balance || 0;
+    const oldRole = userSnap.data()?.role || "user";
     const newBalance = Number(balance);
+    const newRole = role || oldRole;
     const diff = newBalance - oldBalance;
-    await userRef.update({ fullName, balance: newBalance });
+    if (callerRole === "coordinator" && (diff !== 0 || newRole !== oldRole)) {
+        throw new functions.https.HttpsError("permission-denied", "Coordinators cannot change balances or roles.");
+    }
+    await userRef.update({ fullName, balance: newBalance, role: newRole });
     if (diff !== 0) {
         await userRef.collection("transactions").add({
             userId,

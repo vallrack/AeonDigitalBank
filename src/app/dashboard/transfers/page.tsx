@@ -8,10 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2, Search, User, CreditCard, Sparkles } from 'lucide-react';
-import { useUser, useFirestore, useDoc, useFunctions } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { predictiveFraudMonitoring } from '@/ai/flows/predictive-fraud-monitoring';
+import { useUser, useFirestore, useDoc } from '@/firebase';
+import { doc, collection, query, where, getDocs, writeBatch, increment } from 'firebase/firestore';
 import { intelligentExpenseCategorization } from '@/ai/flows/intelligent-expense-categorization';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -36,15 +34,26 @@ export default function TransfersPage() {
   const [fraudResult, setFraudResult] = useState<any>(null);
   const [step, setStep] = useState(1);
 
-  const functions = useFunctions();
-
   const findRecipient = async () => {
     if (!searchQuery) return;
     setIsProcessing(true);
     try {
-      const searchFn = httpsCallable(functions, 'searchRecipient');
-      const result = await searchFn({ query: searchQuery });
-      const foundUser = result.data as { uid: string, fullName: string };
+      const cleanQuery = searchQuery.trim().toLowerCase();
+      let foundUser: any = null;
+
+      if (cleanQuery.includes("@")) {
+        const q = query(collection(db, 'users'), where('email', '==', cleanQuery));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          foundUser = snap.docs[0].data();
+        }
+      } else {
+        toast({ variant: "destructive", title: t.common.error, description: "Please search by email." });
+        setIsProcessing(false);
+        return;
+      }
+
+      if (!foundUser) throw new Error("Not found");
 
       if (foundUser.uid === user?.uid) {
         toast({ 
@@ -53,7 +62,7 @@ export default function TransfersPage() {
           description: t.transfers.search_err_self 
         });
       } else {
-        setRecipientUser(foundUser);
+        setRecipientUser({ uid: foundUser.uid, fullName: foundUser.fullName });
         setStep(2);
       }
     } catch (error: any) {
@@ -132,13 +141,44 @@ export default function TransfersPage() {
     const numAmount = parseFloat(amount);
 
     try {
-      const processTransferFn = httpsCallable(functions, 'processTransfer');
-      await processTransferFn({
-        recipientId: recipientUser.uid,
+      const batch = writeBatch(db);
+      
+      const senderRef = doc(db, 'users', user.uid);
+      const recipientRef = doc(db, 'users', recipientUser.uid);
+      
+      const senderTxRef = doc(collection(db, 'users', user.uid, 'transactions'));
+      const recipientTxRef = doc(collection(db, 'users', recipientUser.uid, 'transactions'));
+
+      batch.update(senderRef, { balance: increment(-numAmount) });
+      batch.update(recipientRef, { balance: increment(numAmount) });
+
+      batch.set(senderTxRef, {
+        userId: user.uid,
+        merchant: `Transferencia a ${recipientUser.fullName}`,
         amount: numAmount,
-        reference: reference,
-        aiCategory: aiCategory
+        category: aiCategory || "Transfer",
+        status: "Completed",
+        date: new Date().toISOString(),
+        type: "expense",
+        reference: reference || "",
+        recipientId: recipientUser.uid,
+        network: "AEON_INTERNAL"
       });
+
+      batch.set(recipientTxRef, {
+        userId: recipientUser.uid,
+        merchant: `Transferencia de ${userData.fullName}`,
+        amount: numAmount,
+        category: "Income",
+        status: "Completed",
+        date: new Date().toISOString(),
+        type: "income",
+        reference: reference || "",
+        senderId: user.uid,
+        network: "AEON_INTERNAL"
+      });
+
+      await batch.commit();
 
       setStep(4);
       toast({ title: t.transfers.success_title });

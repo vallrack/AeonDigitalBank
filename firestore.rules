@@ -22,34 +22,25 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Un usuario solo puede leer su propio perfil, o admin/coordinador puede leer todos
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
+      allow list: if isSignedIn(); // Allow listing for transfer search
       
-      // Permitimos listar si es admin o coordinador
-      allow list: if isAdminOrCoordinator();
+      // Admins and Coordinators can create users client-side
+      allow create: if isAdminOrCoordinator() || (isSignedIn() && request.auth.uid == userId);
       
-      // La creacion de usuarios ahora se maneja en el backend (onUserCreated)
-      allow create: if false;
+      // Users can update their own balance (for transfers) and admins can update everything
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
       
-      // Actualizaciones permitidas solo para campos no sensibles, si es el dueño
-      allow update: if isSignedIn() && (request.auth.uid == userId) && 
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance', 'role', 'kycStatus', 'createdAt', 'email']));
-      
-      // Solo el admin puede borrar usuarios
       allow delete: if isAdmin();
       
       match /transactions/{transactionId} {
-        // Solo el dueño o admin/coordinador puede leer
-        allow read: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
-        // Creacion, actualizacion, y borrado bloqueado para clientes (ahora ocurre en Cloud Functions)
-        allow write: if false;
+        // Allow users to create transactions for themselves or other users during transfers
+        allow read, write: if isSignedIn();
       }
       
       match /virtualCards/{cardId} {
-        // Solo el dueño o admin/coordinador puede leer
-        allow read: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
-        // Creacion, actualizacion, y borrado bloqueado para clientes (ahora ocurre en Cloud Functions)
-        allow write: if false;
+        // Users can create/update their own cards, admins can view
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
       }
     }
   }

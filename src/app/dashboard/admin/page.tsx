@@ -46,6 +46,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useI18n } from '@/lib/i18n/context';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { initializeApp, getApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 
 export default function AdminUsersPage() {
   const { user: currentUser } = useUser();
@@ -83,16 +85,42 @@ export default function AdminUsersPage() {
     setIsProcessing(true);
 
     try {
-      const functions = getFunctions();
-      const adminCreateUser = httpsCallable(functions, 'adminCreateUser');
+      const secondaryApp = initializeApp(getApp().options, 'Secondary');
+      const secondaryAuth = getAuth(secondaryApp);
       
-      await adminCreateUser({
+      const userCredential = await createUserWithEmailAndPassword(
+        secondaryAuth, 
+        newUserData.email, 
+        newUserData.password
+      );
+      const newUid = userCredential.user.uid;
+      
+      await signOut(secondaryAuth);
+      
+      const initBalance = Number(newUserData.balance) || 0;
+      await setDoc(doc(db, 'users', newUid), {
+        uid: newUid,
         email: newUserData.email,
-        password: newUserData.password,
         fullName: newUserData.fullName,
-        balance: newUserData.balance,
-        role: newUserData.role
+        balance: initBalance,
+        role: newUserData.role || 'user',
+        kycStatus: "Verified",
+        createdAt: serverTimestamp()
       });
+
+      if (initBalance > 0) {
+        await addDoc(collection(db, 'users', newUid, 'transactions'), {
+          userId: newUid,
+          merchant: "Admin Initial Deposit",
+          amount: initBalance,
+          category: "Income",
+          status: "Completed",
+          date: new Date().toISOString(),
+          type: "income",
+          reference: "Initial deposit",
+          network: "AEON_INTERNAL"
+        });
+      }
 
       toast({ title: t.common.success });
       setRegisterOpen(false);
@@ -114,12 +142,25 @@ export default function AdminUsersPage() {
     setIsProcessing(true);
 
     try {
-      const functions = getFunctions();
-      const adminDeposit = httpsCallable(functions, 'adminDeposit');
-      await adminDeposit({
-        userId: selectedUser.id,
-        amount: Number(depositAmount)
+      const numAmount = Number(depositAmount);
+      const userRef = doc(db, 'users', selectedUser.id);
+      
+      await updateDoc(userRef, {
+        balance: increment(numAmount)
       });
+      
+      await addDoc(collection(userRef, 'transactions'), {
+        userId: selectedUser.id,
+        merchant: "Admin Manual Deposit",
+        amount: numAmount,
+        category: "Income",
+        status: "Completed",
+        date: new Date().toISOString(),
+        type: "income",
+        reference: "Admin deposit",
+        network: "AEON_INTERNAL"
+      });
+      
       toast({ title: t.admin.deposit + " " + t.common.success });
       setDepositOpen(false);
       setDepositAmount('');
@@ -141,13 +182,13 @@ export default function AdminUsersPage() {
     setIsProcessing(true);
 
     try {
-      const functions = getFunctions();
-      const adminUpdateUser = httpsCallable(functions, 'adminUpdateUser');
-      await adminUpdateUser({
-        userId: selectedUser.id,
+      const userRef = doc(db, 'users', selectedUser.id);
+      await updateDoc(userRef, {
         fullName: selectedUser.fullName,
-        balance: selectedUser.balance
+        balance: Number(selectedUser.balance),
+        role: selectedUser.role
       });
+      
       toast({ title: t.common.save + " " + t.common.success });
       setEditOpen(false);
       setSelectedUser(null);
@@ -166,9 +207,7 @@ export default function AdminUsersPage() {
     if (!confirm(t.common.confirm + "?")) return;
     
     try {
-      const functions = getFunctions();
-      const adminDeleteUser = httpsCallable(functions, 'adminDeleteUser');
-      await adminDeleteUser({ userId });
+      await deleteDoc(doc(db, 'users', userId));
       toast({ title: t.common.success });
     } catch (error: any) {
       toast({

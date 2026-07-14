@@ -13,11 +13,11 @@ import { Slider } from '@/components/ui/slider';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useUser, useFirestore, useCollection } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useI18n } from '@/lib/i18n/context';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+
 
 export default function CardsPage() {
   const { user, loading: userLoading } = useUser();
@@ -38,9 +38,20 @@ export default function CardsPage() {
     setIsCreating(true);
 
     try {
-      const functions = getFunctions();
-      const createVirtualCard = httpsCallable(functions, 'createVirtualCard');
-      await createVirtualCard();
+      const randomCard = "4255" + Math.floor(100000000000 + Math.random() * 900000000000).toString().substring(0, 12);
+      const randomCvv = Math.floor(100 + Math.random() * 900).toString().substring(0, 3);
+      
+      await addDoc(collection(db, 'users', user.uid, 'virtualCards'), {
+        userId: user.uid,
+        cardHolder: (user.displayName || "VALUED CUSTOMER").toUpperCase(),
+        cardNumber: randomCard,
+        expiryDate: "12/28",
+        cvv: randomCvv,
+        isFrozen: false,
+        type: "standard",
+        createdAt: new Date().toISOString()
+      });
+
       toast({
         title: t.cards.success_create,
         description: t.cards.success_create_desc,
@@ -59,9 +70,8 @@ export default function CardsPage() {
   const toggleFreeze = async (card: any) => {
     if (!user) return;
     try {
-      const functions = getFunctions();
-      const toggleVirtualCardFreeze = httpsCallable(functions, 'toggleVirtualCardFreeze');
-      await toggleVirtualCardFreeze({ cardId: card.id, isFrozen: !card.isFrozen });
+      const cardRef = doc(db, 'users', user.uid, 'virtualCards', card.id);
+      await updateDoc(cardRef, { isFrozen: !card.isFrozen });
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -74,9 +84,8 @@ export default function CardsPage() {
   const deleteCard = async (cardId: string) => {
     if (!user) return;
     try {
-      const functions = getFunctions();
-      const deleteVirtualCard = httpsCallable(functions, 'deleteVirtualCard');
-      await deleteVirtualCard({ cardId });
+      const cardRef = doc(db, 'users', user.uid, 'virtualCards', cardId);
+      await deleteDoc(cardRef);
       toast({ title: t.cards.success_delete });
     } catch (error: any) {
       toast({
