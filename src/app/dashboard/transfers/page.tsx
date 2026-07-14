@@ -72,7 +72,7 @@ export default function TransfersPage() {
     setIsAiLoading(true);
     try {
       const result = await intelligentExpenseCategorization({
-        merchant: recipientUser?.fullName || 'AEON Internal',
+        merchant: recipientUser?.fullName || 'Internal Transfer',
         description: reference,
         amount: parseFloat(amount) || 0
       });
@@ -106,11 +106,11 @@ export default function TransfersPage() {
           currency: 'USD',
           timestamp: new Date().toISOString(),
           merchant: recipientUser.fullName,
-          location: 'AEON Secure Node'
+          location: 'Bank of Americans Secure Node'
         },
         userContext: {
           transactionHistory: [], 
-          knownLocations: ['AEON Digital'],
+          knownLocations: ['Bank of Americans Digital'],
           averageTransactionAmount: 200,
           dailySpendLimit: 5000
         }
@@ -289,7 +289,7 @@ export default function TransfersPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm leading-relaxed">{fraudResult?.reason || "Operación verificada dentro de los parámetros de la Red AEON."}</p>
+              <p className="text-sm leading-relaxed">{fraudResult?.reason || "Operación verificada dentro de los parámetros de Bank of Americans."}</p>
               <div className="bg-background/50 p-6 rounded-xl space-y-3 border border-white/5">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Destinatario:</span>

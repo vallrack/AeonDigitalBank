@@ -74,7 +74,7 @@ function TopNav({ userData }: { userData: any }) {
         <div className="hidden md:flex relative w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder={t.common.search + " AEON..."} 
+            placeholder={t.common.search + "..."} 
             className="pl-9 bg-muted/50 border-none focus-visible:ring-1"
           />
         </div>
@@ -117,7 +117,7 @@ function TopNav({ userData }: { userData: any }) {
           <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full" />
         </Button>
         <Avatar className="h-8 w-8 border border-primary/20">
-          <AvatarImage src={`https://picsum.photos/seed/${user?.uid || 'aeon'}/100/100`} />
+          <AvatarImage src={`https://picsum.photos/seed/${user?.uid || 'bofa'}/100/100`} />
           <AvatarFallback>{user?.email?.substring(0,2).toUpperCase() || 'AD'}</AvatarFallback>
         </Avatar>
       </div>
@@ -160,7 +160,7 @@ function DashboardSidebar({ userData }: { userData: any }) {
             <span className="text-primary-foreground font-headline font-bold">A</span>
           </div>
           <span className="font-headline font-bold text-lg tracking-tight group-data-[collapsible=icon]:hidden">
-            AEON <span className="text-accent">BANK</span>
+            Bank of <span className="text-accent">Americans</span>
           </span>
         </Link>
       </SidebarHeader>

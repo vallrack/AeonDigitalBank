@@ -83,7 +83,7 @@ export default function LoginPage() {
       <div className="mb-8 flex flex-col items-center gap-4">
         <Link href="/" className="flex items-center gap-2">
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center glow-indigo">
-             <span className="text-primary font-headline font-bold text-2xl">A</span>
+             <span className="text-primary font-headline font-bold text-2xl">B</span>
           </div>
         </Link>
         <div className="text-center">

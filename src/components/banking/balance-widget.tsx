@@ -54,7 +54,7 @@ export function BalanceWidget({
               Live
             </span>
             <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-            <span className="text-muted-foreground font-medium">AEON Digital Network</span>
+            <span className="text-muted-foreground font-medium">Bank of Americans</span>
           </div>
         </div>
 

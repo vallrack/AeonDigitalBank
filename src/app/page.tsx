@@ -22,10 +22,10 @@ export default function LandingPage() {
       <nav className="h-20 flex items-center justify-between px-4 md:px-12 fixed top-0 w-full z-50 glass border-b border-white/5">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center glow-indigo">
-            <span className="text-primary font-headline font-bold text-xl">A</span>
+            <span className="text-primary font-headline font-bold text-xl">B</span>
           </div>
           <span className="font-headline font-bold text-2xl tracking-tight hidden sm:inline">
-            AEON <span className="text-accent">BANK</span>
+            Bank of <span className="text-accent">Americans</span>
           </span>
         </div>
         
@@ -138,9 +138,9 @@ export default function LandingPage() {
         <div className="flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary font-headline font-bold text-xs">A</span>
+              <span className="text-primary font-headline font-bold text-xs">B</span>
             </div>
-            <span className="font-headline font-bold text-lg tracking-tight">AEON BANK</span>
+            <span className="font-headline font-bold text-lg tracking-tight">BANK OF AMERICANS</span>
           </div>
           
           <div className="flex flex-wrap justify-center gap-4 sm:gap-8 text-sm text-muted-foreground">
@@ -151,7 +151,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            © 2024 Aeon Digital Bank. {t.landing.footer_rights}
+            © 2024 Bank of Americans. {t.landing.footer_rights}
           </p>
         </div>
       </footer>

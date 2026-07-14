@@ -6,8 +6,8 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { I18nProvider } from '@/lib/i18n/context';
 
 export const metadata: Metadata = {
-  title: 'Aeon Bank | Precision Banking',
-  description: 'Experience the future of digital finance with Aeon Bank.',
+  title: 'Bank of Americans | Precision Banking',
+  description: 'Experience the future of digital finance with Bank of Americans.',
 };
 
 export default function RootLayout({
