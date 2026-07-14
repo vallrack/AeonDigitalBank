@@ -8,15 +8,14 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Shield, Eye, EyeOff, ArrowRight, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useI18n } from '@/lib/i18n/context';
+import { VirtualCard } from '@/components/banking/virtual-card';
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -69,105 +68,189 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative">
-      {/* Botón de Regresar */}
-      <div className="absolute top-8 left-8">
-        <Button variant="ghost" asChild className="gap-2 text-muted-foreground hover:text-primary transition-colors">
-          <Link href="/">
-            <ArrowLeft size={18} />
-            {t.common.back}
-          </Link>
-        </Button>
-      </div>
-
-      <div className="mb-8 flex flex-col items-center gap-4">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center glow-indigo">
-             <span className="text-primary font-headline font-bold text-2xl">B</span>
-          </div>
-        </Link>
-        <div className="text-center">
-          <h1 className="text-2xl font-headline font-bold">{t.auth.login_title}</h1>
-          <p className="text-muted-foreground">{t.auth.login_subtitle}</p>
+    <div className="min-h-screen flex flex-col lg:flex-row font-sans">
+      
+      {/* LEFT COLUMN - LOGIN BOX */}
+      <div className="w-full lg:w-[400px] xl:w-[450px] bg-white flex flex-col p-8 lg:p-12 shadow-2xl z-10 relative">
+        {/* Botón de Regresar */}
+        <div className="absolute top-4 left-4">
+          <Button variant="ghost" asChild className="gap-2 text-slate-500 hover:text-slate-900 transition-colors">
+            <Link href="/">
+              <ArrowLeft size={16} /> Volver
+            </Link>
+          </Button>
         </div>
-      </div>
 
-      <Card className="w-full max-w-md glass border-white/5">
-        <form onSubmit={handleLogin}>
-          <CardHeader>
-            <CardTitle className="text-xl font-headline">{t.auth.login_card_title}</CardTitle>
-            <CardDescription>{t.auth.login_card_desc}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="w-full max-w-sm mx-auto mt-8">
+          {/* Top Red Bar simulation */}
+          <div className="w-full flex items-center mb-6">
+            <div className="h-[3px] w-1/3 bg-[#E31837]" />
+            <div className="h-[3px] w-2/3 bg-slate-800" />
+          </div>
+          
+          <h1 className="text-3xl font-light text-slate-800 mb-8 tracking-tight">Bank of Americans</h1>
+          
+          <form onSubmit={handleLogin} className="space-y-5">
             {errorMessage && (
-              <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive text-xs py-2">
-                <AlertCircle className="h-3 w-3" />
+              <Alert variant="destructive" className="bg-red-50 text-red-700 border-red-200">
+                <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{errorMessage}</AlertDescription>
               </Alert>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="email">{t.auth.email}</Label>
+            
+            <div className="space-y-1">
+              <Label htmlFor="email" className="text-slate-700 font-semibold text-xs tracking-wider">ID de usuario</Label>
               <Input 
                 id="email" 
                 type="email" 
-                placeholder={t.auth.email_ph} 
-                className="bg-white/5 border-white/10" 
+                className="bg-white border-slate-300 text-slate-900 focus-visible:ring-1 focus-visible:ring-[#012169] rounded-sm py-5" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label htmlFor="password">{t.auth.password}</Label>
-                <Link href="#" className="text-xs text-primary hover:text-accent">{t.auth.forgot_password}</Link>
-              </div>
-              <div className="relative">
-                <Input 
-                  id="password" 
-                  type={showPassword ? "text" : "password"} 
-                  className="bg-white/5 border-white/10 pr-10" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <button 
-                  type="button"
-                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+            
+            <div className="space-y-1">
+              <Label htmlFor="password" className="text-slate-700 font-semibold text-xs tracking-wider">Contraseña</Label>
+              <Input 
+                id="password" 
+                type="password"
+                className="bg-white border-slate-300 text-slate-900 focus-visible:ring-1 focus-visible:ring-[#012169] rounded-sm py-5" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
             </div>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-4">
+            
+            <div className="flex items-center space-x-2 pt-2">
+              <input type="checkbox" id="saveId" className="rounded-sm border-slate-400 w-4 h-4 text-[#012169] focus:ring-[#012169]" />
+              <label htmlFor="saveId" className="text-sm text-slate-700">Guardar ID de usuario</label>
+            </div>
+            
             <Button 
               type="submit" 
-              className="w-full glow-indigo group" 
+              className="w-full bg-[#012169] hover:bg-[#001440] text-white py-6 text-base rounded-md font-semibold transition-colors mt-6 shadow-md" 
               disabled={isLoading}
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t.auth.authenticating}
-                </>
-              ) : (
-                <>
-                  {t.common.sign_in} <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
-                </>
-              )}
+              {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : 'Iniciar una sesión'}
             </Button>
-            <div className="text-center text-sm text-muted-foreground">
-              {t.auth.no_account} <Link href="/register" className="text-primary hover:text-accent font-medium">{t.common.get_started}</Link>
+            
+            <div className="flex flex-wrap items-center gap-3 text-xs mt-6 px-1">
+              <Link href="#" className="text-[#012169] hover:underline">Olvidé la ID/Contraseña</Link>
+              <span className="text-slate-300">|</span>
+              <Link href="#" className="text-[#012169] hover:underline">Seguridad y ayuda</Link>
+              <span className="text-slate-300">|</span>
+              <Link href="/register" className="text-[#012169] hover:underline">Inscribirse</Link>
             </div>
-          </CardFooter>
-        </form>
-      </Card>
+            
+            <div className="mt-8 pt-8 border-t border-slate-200">
+               <Button variant="outline" className="w-full border-slate-300 text-[#012169] hover:bg-slate-50 py-6 font-semibold rounded-md shadow-sm" asChild>
+                 <Link href="/register">Abrir una cuenta</Link>
+               </Button>
+            </div>
+          </form>
+        </div>
+      </div>
 
-      <div className="mt-8 flex items-center gap-2 text-xs text-muted-foreground font-headline">
-        <Shield size={14} className="text-emerald-400" />
-        {t.common.bank_security}
+      {/* RIGHT COLUMN - PROMOTIONS */}
+      <div className="flex-1 bg-gradient-to-br from-[#012169] via-[#0b3896] to-[#012169] p-8 lg:p-12 xl:p-16 flex flex-col justify-center min-h-screen">
+        <div className="max-w-6xl mx-auto w-full">
+          <h2 className="text-3xl md:text-4xl font-light text-white mb-16 text-center lg:text-left">
+            Elija la tarjeta que funcione para usted
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8 xl:gap-4">
+            
+            {/* Card 1 */}
+            <div className="flex flex-col items-center gap-5">
+              <div className="text-center text-white h-28 flex flex-col justify-end">
+                <div className="text-6xl font-light mb-1">6<span className="text-3xl">%</span></div>
+                <p className="text-[13px] leading-tight">de oferta en reembolsos<br/>de dinero en efectivo<br/><span className="text-[11px] opacity-80 mt-1 block">Sin cuota anual.</span></p>
+              </div>
+              <div className="w-full max-w-[260px]">
+                <VirtualCard 
+                  cardHolder="VALUED CUSTOMER" 
+                  cardNumber="4123 4567 8901 2345" 
+                  expiryDate="12/28" 
+                  cvv="123" 
+                  type="customized-cash" 
+                  interactive={false}
+                />
+              </div>
+              <div className="text-white text-sm mt-1 text-center">Customized Cash Rewards</div>
+              <div className="bg-white text-[#012169] font-bold text-sm text-center py-2.5 px-4 rounded w-full max-w-[260px] shadow-sm">
+                $200 de oferta de<br/>bonificación en línea
+              </div>
+            </div>
+
+            {/* Card 2 */}
+            <div className="flex flex-col items-center gap-5">
+              <div className="text-center text-white h-28 flex flex-col justify-end">
+                <div className="text-6xl font-light mb-1">2<span className="text-3xl">%</span></div>
+                <p className="text-[13px] leading-tight">de oferta en reembolsos<br/>de dinero en efectivo<br/><span className="text-[11px] opacity-80 mt-1 block">Sin cuota anual.</span></p>
+              </div>
+              <div className="w-full max-w-[260px]">
+                <VirtualCard 
+                  cardHolder="VALUED CUSTOMER" 
+                  cardNumber="4812 3456 7890 1234" 
+                  expiryDate="08/27" 
+                  cvv="456" 
+                  type="unlimited-cash" 
+                  interactive={false}
+                />
+              </div>
+              <div className="text-white text-sm mt-1 text-center">Unlimited Cash Rewards</div>
+              <div className="bg-white text-[#012169] font-bold text-sm text-center py-2.5 px-4 rounded w-full max-w-[260px] shadow-sm">
+                $200 de oferta de<br/>bonificación en línea
+              </div>
+            </div>
+
+            {/* Card 3 */}
+            <div className="flex flex-col items-center gap-5">
+              <div className="text-center text-white h-28 flex flex-col justify-end">
+                <div className="text-6xl font-light mb-1">1.5</div>
+                <p className="text-[13px] leading-tight">puntos por cada $1<br/><br/><span className="text-[11px] opacity-80 mt-1 block">Sin cuota anual.</span></p>
+              </div>
+              <div className="w-full max-w-[260px]">
+                <VirtualCard 
+                  cardHolder="VALUED CUSTOMER" 
+                  cardNumber="4555 6789 0123 4567" 
+                  expiryDate="11/29" 
+                  cvv="789" 
+                  type="travel-rewards" 
+                  interactive={false}
+                />
+              </div>
+              <div className="text-white text-sm mt-1 text-center">Travel Rewards</div>
+              <div className="bg-white text-[#012169] font-bold text-sm text-center py-2.5 px-4 rounded w-full max-w-[260px] shadow-sm">
+                25,000 puntos de oferta de<br/>bonificación en línea
+              </div>
+            </div>
+
+            {/* Card 4 */}
+            <div className="flex flex-col items-center gap-5">
+              <div className="text-center text-white h-28 flex flex-col justify-end">
+                <div className="text-6xl font-light mb-1">0<span className="text-3xl">%</span></div>
+                <p className="text-[13px] leading-tight">oferta de Tasa<br/>APR introductoria<br/><span className="text-[11px] opacity-80 mt-1 block">Sin cuota anual.</span></p>
+              </div>
+              <div className="w-full max-w-[260px]">
+                <VirtualCard 
+                  cardHolder="VALUED CUSTOMER" 
+                  cardNumber="5123 4567 8901 2345" 
+                  expiryDate="05/26" 
+                  cvv="012" 
+                  type="bankamericard" 
+                  interactive={false}
+                />
+              </div>
+              <div className="text-white text-sm mt-1 text-center">BankAmericard®</div>
+              <div className="bg-white text-[#012169] font-bold text-[13px] leading-snug text-center py-2 px-3 rounded w-full max-w-[260px] shadow-sm">
+                Oferta de Tasa APR<br/>introductoria durante 21<br/>ciclos de facturación
+              </div>
+            </div>
+
+          </div>
+        </div>
       </div>
     </div>
   );

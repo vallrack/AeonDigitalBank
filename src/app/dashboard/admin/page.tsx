@@ -80,6 +80,8 @@ export default function AdminUsersPage() {
     u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const currentUserData = users.find(u => u.id === currentUser?.uid);
+
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -285,6 +287,23 @@ export default function AdminUsersPage() {
                     required
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>{t.admin.role || "Rol"}</Label>
+                  <Select value={newUserData.role} onValueChange={(value) => setNewUserData({...newUserData, role: value})}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="glass">
+                      <SelectItem value="user">{t.settings.client || "Cliente"}</SelectItem>
+                      {currentUserData?.role === 'admin' && (
+                        <>
+                          <SelectItem value="coordinator">{t.admin.coordinator || "Coordinador"}</SelectItem>
+                          <SelectItem value="admin">{t.settings.admin || "Admin"}</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <DialogFooter>
                 <Button type="submit" className="w-full glow-indigo" disabled={isProcessing}>
@@ -376,7 +395,7 @@ export default function AdminUsersPage() {
                           <DropdownMenuContent align="end" className="glass border-white/10">
                             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-white/10" />
-                            {currentUser?.role === 'admin' && (
+                            {currentUserData?.role === 'admin' && (
                               <DropdownMenuItem onClick={() => { setSelectedUser(u); setDepositOpen(true); }}>
                                 <ArrowUpCircle size={12} className="mr-2 text-emerald-400"/>{t.admin.deposit}
                               </DropdownMenuItem>
@@ -384,7 +403,7 @@ export default function AdminUsersPage() {
                             <DropdownMenuItem onClick={() => { setSelectedUser(u); setEditOpen(true); }}>
                               <Edit size={12} className="mr-2"/>{t.common.edit}
                             </DropdownMenuItem>
-                            {currentUser?.role === 'admin' && (
+                            {currentUserData?.role === 'admin' && (
                               <>
                                 <DropdownMenuSeparator className="bg-white/10" />
                                 <DropdownMenuItem onClick={() => handleDeleteUser(u.id)} className="text-destructive">
@@ -429,7 +448,7 @@ export default function AdminUsersPage() {
                   </SelectTrigger>
                   <SelectContent className="glass">
                     <SelectItem value="user">{t.settings.client || "Cliente"}</SelectItem>
-                    {currentUser?.role === 'admin' && (
+                    {currentUserData?.role === 'admin' && (
                       <>
                         <SelectItem value="coordinator">{t.admin.coordinator || "Coordinador"}</SelectItem>
                         <SelectItem value="admin">{t.settings.admin || "Admin"}</SelectItem>
