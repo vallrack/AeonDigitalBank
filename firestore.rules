@@ -11,12 +11,22 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isCoordinator() {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'coordinator';
+    }
+
+    function isAdminOrCoordinator() {
+      return isAdmin() || isCoordinator();
+    }
+
     match /users/{userId} {
-      // Un usuario solo puede leer su propio perfil, o admin puede leer todos
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Un usuario solo puede leer su propio perfil, o admin/coordinador puede leer todos
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
       
-      // Permitimos listar si es admin
-      allow list: if isAdmin();
+      // Permitimos listar si es admin o coordinador
+      allow list: if isAdminOrCoordinator();
       
       // La creacion de usuarios ahora se maneja en el backend (onUserCreated)
       allow create: if false;
@@ -29,15 +39,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
       
       match /transactions/{transactionId} {
-        // Solo el dueño o admin puede leer
-        allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        // Solo el dueño o admin/coordinador puede leer
+        allow read: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
         // Creacion, actualizacion, y borrado bloqueado para clientes (ahora ocurre en Cloud Functions)
         allow write: if false;
       }
       
       match /virtualCards/{cardId} {
-        // Solo el dueño o admin puede leer
-        allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        // Solo el dueño o admin/coordinador puede leer
+        allow read: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
         // Creacion, actualizacion, y borrado bloqueado para clientes (ahora ocurre en Cloud Functions)
         allow write: if false;
       }

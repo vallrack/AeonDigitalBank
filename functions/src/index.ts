@@ -206,11 +206,19 @@ export const adminCreateUser = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
   
   const callerSnap = await db.collection("users").doc(context.auth.uid).get();
-  if (callerSnap.data()?.role !== "admin") {
-    throw new functions.https.HttpsError("permission-denied", "Requires admin role.");
+  const callerRole = callerSnap.data()?.role;
+  
+  if (callerRole !== "admin" && callerRole !== "coordinator") {
+    throw new functions.https.HttpsError("permission-denied", "Requires admin or coordinator role.");
   }
 
-  const { email, password, fullName, balance } = data;
+  const { email, password, fullName, balance, role } = data;
+  const newRole = role || "user";
+
+  // Coordinators can only create 'user' roles
+  if (callerRole === "coordinator" && newRole !== "user") {
+    throw new functions.https.HttpsError("permission-denied", "Coordinators can only create regular users.");
+  }
   
   try {
     const userRecord = await admin.auth().createUser({
@@ -226,7 +234,7 @@ export const adminCreateUser = functions.https.onCall(async (data, context) => {
       email: email,
       fullName: fullName,
       balance: initBalance,
-      role: "user",
+      role: newRole,
       kycStatus: "Verified",
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -279,16 +287,26 @@ export const adminDeposit = functions.https.onCall(async (data, context) => {
 export const adminUpdateUser = functions.https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "User must be authenticated.");
   const callerSnap = await db.collection("users").doc(context.auth.uid).get();
-  if (callerSnap.data()?.role !== "admin") throw new functions.https.HttpsError("permission-denied", "Requires admin role.");
+  const callerRole = callerSnap.data()?.role;
+  if (callerRole !== "admin" && callerRole !== "coordinator") {
+    throw new functions.https.HttpsError("permission-denied", "Requires admin or coordinator role.");
+  }
 
-  const { userId, fullName, balance } = data;
+  const { userId, fullName, balance, role } = data;
   const userRef = db.collection("users").doc(userId);
   const userSnap = await userRef.get();
+  
   const oldBalance = userSnap.data()?.balance || 0;
+  const oldRole = userSnap.data()?.role || "user";
   const newBalance = Number(balance);
+  const newRole = role || oldRole;
   const diff = newBalance - oldBalance;
 
-  await userRef.update({ fullName, balance: newBalance });
+  if (callerRole === "coordinator" && (diff !== 0 || newRole !== oldRole)) {
+    throw new functions.https.HttpsError("permission-denied", "Coordinators cannot change balances or roles.");
+  }
+
+  await userRef.update({ fullName, balance: newBalance, role: newRole });
 
   if (diff !== 0) {
     await userRef.collection("transactions").add({

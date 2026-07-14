@@ -175,6 +175,9 @@ export const translations = {
       balance: "Saldo ($)",
       add_balance: "Añadir saldo a la cuenta de",
       amount_usd: "Monto (USD)",
+      role: "Rol",
+      select_role: "Seleccionar Rol",
+      coordinator: "Coordinador",
     },
     cards: {
       title: "Tarjetas Virtuales",
@@ -216,6 +219,9 @@ export const translations = {
       col_status: "Estado",
       aeon_network: "Red AEON",
       no_ref: "Sin concepto",
+      export_pdf: "Exportar a PDF",
+      statement_title: "Estado de Cuenta Oficial",
+      generated_on: "Generado el:",
     },
     security: {
       title: "Centro de Seguridad",
@@ -418,6 +424,9 @@ export const translations = {
       balance: "Balance ($)",
       add_balance: "Add balance to account of",
       amount_usd: "Amount (USD)",
+      role: "Role",
+      select_role: "Select Role",
+      coordinator: "Coordinator",
     },
 
     transfers: {
@@ -491,6 +500,9 @@ export const translations = {
       col_status: "Status",
       aeon_network: "AEON Network",
       no_ref: "No concept",
+      export_pdf: "Export to PDF",
+      statement_title: "Official Statement",
+      generated_on: "Generated on:",
     },
     security: {
       title: "Security Center",

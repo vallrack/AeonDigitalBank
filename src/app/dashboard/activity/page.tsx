@@ -9,10 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Filter, ArrowUpRight, ArrowDownRight, Loader2, CreditCard } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, ArrowDownRight, Loader2, CreditCard, Download } from 'lucide-react';
 import { PrivacyMask } from '@/components/incognito-context';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n/context';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function ActivityPage() {
   const { user } = useUser();
@@ -35,6 +37,55 @@ export default function ActivityPage() {
     tx.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     tx.reference?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setTextColor(30, 58, 138); 
+    doc.text("Aeon Digital Bank", 14, 22);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text(t.activity.statement_title || "Official Statement", 14, 32);
+    doc.text(`${t.activity.generated_on || "Generated on:"} ${new Date().toLocaleDateString()}`, 14, 40);
+    
+    // Table Data
+    const tableColumn = [
+      t.activity.col_date || "Date", 
+      t.activity.col_entity || "Entity", 
+      t.activity.col_category || "Category", 
+      t.activity.col_ref || "Ref", 
+      t.activity.col_amount || "Amount", 
+      t.activity.col_status || "Status"
+    ];
+    
+    const tableRows: any[] = [];
+    
+    filteredTransactions.forEach(tx => {
+      const txData = [
+        new Date(tx.date).toLocaleDateString(),
+        tx.merchant || '',
+        tx.category || '',
+        tx.reference || '',
+        `${tx.type === 'expense' ? '-' : '+'}$${Math.abs(tx.amount || 0).toFixed(2)}`,
+        tx.status === 'Completed' ? (language === 'es' ? 'Completada' : 'Completed') : (language === 'es' ? 'Pendiente' : 'Pending')
+      ];
+      tableRows.push(txData);
+    });
+    
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 50,
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 3 },
+      headStyles: { fillColor: [15, 23, 42] } 
+    });
+    
+    doc.save(`Aeon_Statement_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -72,10 +123,16 @@ export default function ActivityPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter size={14} />
-              {t.activity.adv_filters}
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={exportToPDF} size="sm" className="gap-2 bg-indigo-500 hover:bg-indigo-600 text-white">
+                <Download size={14} />
+                {t.activity.export_pdf || "Exportar PDF"}
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Filter size={14} />
+                {t.activity.adv_filters}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

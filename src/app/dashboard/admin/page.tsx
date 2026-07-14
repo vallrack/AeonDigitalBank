@@ -40,6 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -62,7 +63,8 @@ export default function AdminUsersPage() {
     fullName: '',
     email: '',
     password: '',
-    balance: 5000
+    balance: 5000,
+    role: 'user'
   });
 
   const usersQuery = useMemo(() => {
@@ -88,12 +90,13 @@ export default function AdminUsersPage() {
         email: newUserData.email,
         password: newUserData.password,
         fullName: newUserData.fullName,
-        balance: newUserData.balance
+        balance: newUserData.balance,
+        role: newUserData.role
       });
 
       toast({ title: t.common.success });
       setRegisterOpen(false);
-      setNewUserData({ fullName: '', email: '', password: '', balance: 5000 });
+      setNewUserData({ fullName: '', email: '', password: '', balance: 5000, role: 'user' });
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -309,10 +312,16 @@ export default function AdminUsersPage() {
                     <TableRow key={u.id} className="border-white/5 hover:bg-white/5">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8"><AvatarImage src={`https://picsum.photos/seed/${u.id}/100/100`} /><AvatarFallback>{u.fullName?.[0]}</AvatarFallback></Avatar>
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={`https://picsum.photos/seed/${u.id}/100/100`} />
+                            <AvatarFallback className="bg-primary/20 text-primary">
+                              {u.fullName?.substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
                           <div>
                             <div className="font-bold text-sm truncate max-w-[120px] sm:max-w-none">{u.fullName}</div>
-                            <Badge variant="secondary" className="text-[8px] h-3">{u.role}</Badge>
+                            {u.role === 'admin' && <Badge variant="outline" className="ml-0 text-[8px] h-3 border-primary text-primary">Admin</Badge>}
+                            {u.role === 'coordinator' && <Badge variant="outline" className="ml-0 text-[8px] h-3 border-accent text-accent">Coord</Badge>}
                           </div>
                         </div>
                       </TableCell>
@@ -326,16 +335,24 @@ export default function AdminUsersPage() {
                             <Button variant="ghost" size="icon"><MoreVertical size={14} /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="glass border-white/10">
-                            <DropdownMenuItem onClick={() => { setSelectedUser(u); setDepositOpen(true); }}>
-                              <ArrowUpCircle size={12} className="mr-2 text-emerald-400"/>{t.admin.deposit}
-                            </DropdownMenuItem>
+                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            {currentUser?.role === 'admin' && (
+                              <DropdownMenuItem onClick={() => { setSelectedUser(u); setDepositOpen(true); }}>
+                                <ArrowUpCircle size={12} className="mr-2 text-emerald-400"/>{t.admin.deposit}
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => { setSelectedUser(u); setEditOpen(true); }}>
                               <Edit size={12} className="mr-2"/>{t.common.edit}
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-white/5" />
-                            <DropdownMenuItem onClick={() => handleDeleteUser(u.id)} className="text-destructive">
-                              <Trash2 size={12} className="mr-2"/>{t.common.delete}
-                            </DropdownMenuItem>
+                            {currentUser?.role === 'admin' && (
+                              <>
+                                <DropdownMenuSeparator className="bg-white/10" />
+                                <DropdownMenuItem onClick={() => handleDeleteUser(u.id)} className="text-destructive">
+                                  <Trash2 size={12} className="mr-2"/>{t.common.delete}
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -364,6 +381,23 @@ export default function AdminUsersPage() {
               <div className="space-y-2">
                 <Label>{t.admin.balance}</Label>
                 <Input type="number" value={selectedUser.balance} onChange={e => setSelectedUser({...selectedUser, balance: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>{t.admin.role || "Rol"}</Label>
+                <Select value={selectedUser.role} onValueChange={(value) => setSelectedUser({...selectedUser, role: value})}>
+                  <SelectTrigger className="bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="glass">
+                    <SelectItem value="user">{t.settings.client || "Cliente"}</SelectItem>
+                    {currentUser?.role === 'admin' && (
+                      <>
+                        <SelectItem value="coordinator">{t.admin.coordinator || "Coordinador"}</SelectItem>
+                        <SelectItem value="admin">{t.settings.admin || "Admin"}</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
               <DialogFooter><Button type="submit" disabled={isProcessing}>{t.common.save}</Button></DialogFooter>
             </form>
