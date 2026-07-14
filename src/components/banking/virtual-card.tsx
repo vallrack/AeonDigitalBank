@@ -172,8 +172,12 @@ export function VirtualCard({
           
           {/* Optional Flag */}
           {showFlag && (
-             <div className="absolute bottom-4 right-16 w-8 h-10 bg-white/20 rounded flex items-center justify-center backdrop-blur-sm border border-white/20">
-                <span className="text-[8px] opacity-80 text-center font-bold leading-tight">FIFA<br/>2026</span>
+             <div className="absolute bottom-4 right-16 w-9 h-11 flex items-center justify-center">
+                <img 
+                  src="https://assets.football-logos.cc/logos/tournaments/700x700/fifa-world-cup-2026--white.9ba8a004.png" 
+                  alt="FIFA World Cup 2026" 
+                  className="w-full h-full object-contain drop-shadow-sm opacity-90"
+                />
              </div>
           )}
         </div>
