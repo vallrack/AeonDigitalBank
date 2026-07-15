@@ -599,7 +599,12 @@ export default function AdminUsersPage() {
                                     <ShieldAlert className="mr-2 h-4 w-4" /> Activar Ahora
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem onClick={() => { setSelectedUser(u); setEditOpen(true); }}>
+                                <DropdownMenuItem onClick={() => { 
+                                    // Strip heavy base64 fields to prevent crash
+                                    const { kycIdPhoto, kycFacePhoto, ...safeUser } = u;
+                                    setSelectedUser(safeUser); 
+                                    setEditOpen(true); 
+                                  }}>
                                   <Edit className="mr-2 h-4 w-4" /> {t.common.edit}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setSelectedUser(u); setDepositOpen(true); }}>
