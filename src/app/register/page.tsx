@@ -55,14 +55,37 @@ export default function RegisterPage() {
   const [selectedCardIndex, setSelectedCardIndex] = useState(0);
   const [idFileName, setIdFileName] = useState('');
 
+  // Convert PDF first page to a compressed JPEG image using PDF.js
+  const pdfToImage = async (file: File): Promise<string> => {
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(1);
+
+    const scale = 1.2;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d')!;
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    // Compress the resulting image
+    return compressImage(canvas.toDataURL('image/jpeg'), 600, 0.7);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
     const file = e.target.files?.[0];
     if (file) {
       setIdFileName(file.name);
-      // For PDFs, we only store metadata (too large for Firestore)
-      // For images, we read and compress them
       if (file.type === 'application/pdf') {
-        setter(`pdf:${file.name}:${file.size}`);
+        // Convert PDF first page to JPEG image
+        pdfToImage(file).then(setter).catch(() => {
+          // Fallback: store metadata if conversion fails
+          setter(`pdf:${file.name}:${file.size}`);
+        });
       } else {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -160,12 +183,11 @@ export default function RegisterPage() {
       // Save compressed KYC images directly to Firestore (no Storage needed)
       let compressedId = '';
       let compressedFace = '';
-      // Only compress if it's an actual image (not a PDF placeholder)
+      // idPhoto is already an image (compressed by handleFileChange for PDFs too)
       if (idPhoto && !idPhoto.startsWith('pdf:')) {
         compressedId = await compressImage(idPhoto);
       } else if (idPhoto && idPhoto.startsWith('pdf:')) {
-        // Store PDF metadata only (name and size)
-        compressedId = idPhoto;
+        compressedId = idPhoto; // fallback metadata
       }
       if (facePhoto) compressedFace = await compressImage(facePhoto);
 
