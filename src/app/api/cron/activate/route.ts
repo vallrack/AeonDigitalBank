@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/firebase/admin';
+import { initializeFirebase } from '@/firebase/index';
+import { collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
 // Vercel cron job endpoint (e.g. called every hour)
 export async function GET(request: Request) {
@@ -11,8 +12,12 @@ export async function GET(request: Request) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
+    const { db } = initializeFirebase();
+
     // Query all users with status = 'pending'
-    const usersSnapshot = await db.collection('users').where('status', '==', 'pending').get();
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('status', '==', 'pending'));
+    const usersSnapshot = await getDocs(q);
     
     if (usersSnapshot.empty) {
       return NextResponse.json({ success: true, activated: 0, message: 'No pending users found.' });
@@ -21,15 +26,15 @@ export async function GET(request: Request) {
     const now = new Date();
     let activatedCount = 0;
 
-    for (const doc of usersSnapshot.docs) {
-      const data = doc.data();
+    for (const docSnapshot of usersSnapshot.docs) {
+      const data = docSnapshot.data();
       
       // If activationTime is set and has passed
       if (data.activationTime) {
         const activationTime = new Date(data.activationTime);
         if (now >= activationTime) {
           // Activate user
-          await doc.ref.update({ status: 'active' });
+          await updateDoc(docSnapshot.ref, { status: 'active' });
           activatedCount++;
 
           // Send Welcome Email
