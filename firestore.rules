@@ -42,6 +42,12 @@ service cloud.firestore {
         // Users can create/update their own cards, admins can view
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
       }
+
+      match /kyc/{kycId} {
+        // Users write their own KYC docs during registration, admins can read
+        allow write: if isSignedIn() && request.auth.uid == userId;
+        allow read: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
+      }
     }
   }
 }
