@@ -55,17 +55,33 @@ export default function RegisterPage() {
   const [selectedCardIndex, setSelectedCardIndex] = useState(0);
   const [idFileName, setIdFileName] = useState('');
 
-  // Convert PDF first page to a compressed JPEG image using PDF.js
-  const pdfToImage = async (file: File): Promise<string> => {
-    // Use legacy build to avoid Next.js worker bundling issues
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs' as any);
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs`;
+  // Load PDF.js from CDN (avoids Next.js webpack bundling issues)
+  const loadPdfJs = (): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      if ((window as any).pdfjsLib) {
+        resolve((window as any).pdfjsLib);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      script.onload = () => {
+        const lib = (window as any).pdfjsLib;
+        lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        resolve(lib);
+      };
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  };
 
+  // Convert PDF first page to a compressed JPEG image using PDF.js from CDN
+  const pdfToImage = async (file: File): Promise<string> => {
+    const pdfjsLib = await loadPdfJs();
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const page = await pdf.getPage(1);
 
-    const scale = 1.2;
+    const scale = 1.5;
     const viewport = page.getViewport({ scale });
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
