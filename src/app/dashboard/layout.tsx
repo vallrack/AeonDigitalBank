@@ -44,8 +44,7 @@ import { useI18n } from '@/lib/i18n/context';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth, useUser, useDoc, useFirestore } from '@/firebase';
-import { verifyBiometrics } from '@/lib/webauthn';
-import { signOut } from 'firebase/auth';
+import { getAuth, signOut } from 'firebase/auth';
 import { doc, getDocs, collection, query, limit, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -325,17 +324,41 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
     }
   }, [userData, isUnlocked]);
 
+  const handleLogoutFallback = async () => {
+    const auth = getAuth();
+    await signOut(auth);
+    window.location.href = '/login';
+  };
+
   const handleBiometricUnlock = async () => {
-    if (!userData?.biometricCredentialId) return;
     setIsUnlocking(true);
     try {
-      const success = await verifyBiometrics(userData.biometricCredentialId);
-      if (success) {
-        setIsUnlocked(true);
-        setNeedsBiometric(false);
+      const storedBio = localStorage.getItem('AeonBank_BioAuth');
+      if (storedBio && window.PublicKeyCredential) {
+        const bioData = JSON.parse(storedBio);
+        const credential = await navigator.credentials.get({
+          publicKey: {
+            challenge: new Uint8Array(32),
+            allowCredentials: [{
+              id: Uint8Array.from(atob(bioData.id), c => c.charCodeAt(0)),
+              type: 'public-key'
+            }],
+            timeout: 60000,
+            userVerification: 'required'
+          }
+        });
+        
+        if (credential) {
+          setIsUnlocked(true);
+          setNeedsBiometric(false);
+        }
+      } else {
+        throw new Error("Dispositivo sin llaves biométricas registradas.");
       }
     } catch (error) {
       console.error(error);
+      // Auto-fallback a login normal
+      handleLogoutFallback();
     } finally {
       setIsUnlocking(false);
     }
@@ -353,6 +376,13 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
            <Fingerprint size={18} />
            {isUnlocking ? "Verificando..." : "Desbloquear con Biometría"}
          </Button>
+         <button 
+            type="button" 
+            onClick={handleLogoutFallback}
+            className="text-sm text-slate-500 hover:text-slate-800 underline mt-6"
+         >
+            Usar contraseña / PIN de la cuenta
+         </button>
       </div>
     );
   }
