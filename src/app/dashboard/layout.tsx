@@ -316,6 +316,12 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
   const [needsBiometric, setNeedsBiometric] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('AeonBank_Unlocked') === 'true') {
+      setIsUnlocked(true);
+    }
+  }, []);
+
+  useEffect(() => {
     if (userData && userData.biometricsEnabled && !isUnlocked) {
       setNeedsBiometric(true);
     } else if (userData && !userData.biometricsEnabled) {
@@ -349,6 +355,7 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
         });
         
         if (credential) {
+          sessionStorage.setItem('AeonBank_Unlocked', 'true');
           setIsUnlocked(true);
           setNeedsBiometric(false);
         }

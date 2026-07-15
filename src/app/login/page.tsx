@@ -68,6 +68,7 @@ export default function LoginPage() {
         
         await signInWithEmailAndPassword(auth, bioAuthData.email, dec);
         
+        sessionStorage.setItem('AeonBank_Unlocked', 'true');
         toast({ title: t.auth.login_success, description: "Sesión iniciada con huella dactilar" });
         router.push('/dashboard');
       }
@@ -102,6 +103,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      sessionStorage.setItem('AeonBank_Unlocked', 'true');
       toast({
         title: t.auth.login_success,
         description: t.auth.login_success_desc,
