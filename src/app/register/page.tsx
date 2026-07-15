@@ -53,15 +53,23 @@ export default function RegisterPage() {
   ];
   
   const [selectedCardIndex, setSelectedCardIndex] = useState(0);
+  const [idFileName, setIdFileName] = useState('');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setter(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setIdFileName(file.name);
+      // For PDFs, we only store metadata (too large for Firestore)
+      // For images, we read and compress them
+      if (file.type === 'application/pdf') {
+        setter(`pdf:${file.name}:${file.size}`);
+      } else {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setter(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -152,7 +160,13 @@ export default function RegisterPage() {
       // Save compressed KYC images directly to Firestore (no Storage needed)
       let compressedId = '';
       let compressedFace = '';
-      if (idPhoto) compressedId = await compressImage(idPhoto);
+      // Only compress if it's an actual image (not a PDF placeholder)
+      if (idPhoto && !idPhoto.startsWith('pdf:')) {
+        compressedId = await compressImage(idPhoto);
+      } else if (idPhoto && idPhoto.startsWith('pdf:')) {
+        // Store PDF metadata only (name and size)
+        compressedId = idPhoto;
+      }
       if (facePhoto) compressedFace = await compressImage(facePhoto);
 
       // Create user profile in Firestore
