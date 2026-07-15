@@ -61,11 +61,14 @@ export default function AdminUsersPage() {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [depositAmount, setDepositAmount] = useState('');
 
+  const [depositAccount, setDepositAccount] = useState<'checking' | 'savings'>('checking');
+
   const [newUserData, setNewUserData] = useState({
     fullName: '',
     email: '',
     password: '',
-    balance: 5000,
+    checkingBalance: 5000,
+    savingsBalance: 0,
     role: 'user'
   });
 
@@ -99,34 +102,52 @@ export default function AdminUsersPage() {
       
       await signOut(secondaryAuth);
       
-      const initBalance = Number(newUserData.balance) || 0;
+      const initChecking = Number(newUserData.checkingBalance) || 0;
+      const initSavings = Number(newUserData.savingsBalance) || 0;
       await setDoc(doc(db, 'users', newUid), {
         uid: newUid,
         email: newUserData.email,
         fullName: newUserData.fullName,
-        balance: initBalance,
+        checkingBalance: initChecking,
+        savingsBalance: initSavings,
         role: newUserData.role || 'user',
         kycStatus: "Verified",
         createdAt: serverTimestamp()
       });
 
-      if (initBalance > 0) {
+      if (initChecking > 0) {
         await addDoc(collection(db, 'users', newUid, 'transactions'), {
           userId: newUid,
-          merchant: "Admin Initial Deposit",
-          amount: initBalance,
+          merchant: "Admin Initial Checking Deposit",
+          amount: initChecking,
           category: "Income",
           status: "Completed",
           date: new Date().toISOString(),
           type: "income",
           reference: "Initial deposit",
+          account: "checking",
+          network: "AEON_INTERNAL"
+        });
+      }
+      
+      if (initSavings > 0) {
+        await addDoc(collection(db, 'users', newUid, 'transactions'), {
+          userId: newUid,
+          merchant: "Admin Initial Savings Deposit",
+          amount: initSavings,
+          category: "Income",
+          status: "Completed",
+          date: new Date().toISOString(),
+          type: "income",
+          reference: "Initial deposit",
+          account: "savings",
           network: "AEON_INTERNAL"
         });
       }
 
       toast({ title: t.common.success });
       setRegisterOpen(false);
-      setNewUserData({ fullName: '', email: '', password: '', balance: 5000, role: 'user' });
+      setNewUserData({ fullName: '', email: '', password: '', checkingBalance: 5000, savingsBalance: 0, role: 'user' });
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -148,7 +169,7 @@ export default function AdminUsersPage() {
       const userRef = doc(db, 'users', selectedUser.id);
       
       await updateDoc(userRef, {
-        balance: increment(numAmount)
+        [depositAccount === 'checking' ? 'checkingBalance' : 'savingsBalance']: increment(numAmount)
       });
       
       await addDoc(collection(userRef, 'transactions'), {
@@ -160,6 +181,7 @@ export default function AdminUsersPage() {
         date: new Date().toISOString(),
         type: "income",
         reference: "Admin deposit",
+        account: depositAccount,
         network: "AEON_INTERNAL"
       });
       
@@ -187,7 +209,8 @@ export default function AdminUsersPage() {
       const userRef = doc(db, 'users', selectedUser.id);
       await updateDoc(userRef, {
         fullName: selectedUser.fullName,
-        balance: Number(selectedUser.balance),
+        checkingBalance: Number(selectedUser.checkingBalance ?? selectedUser.balance ?? 0),
+        savingsBalance: Number(selectedUser.savingsBalance ?? 0),
         role: selectedUser.role
       });
       
@@ -221,7 +244,7 @@ export default function AdminUsersPage() {
   };
 
   const totalReserves = useMemo(() => {
-    return users.reduce((acc, u) => acc + (Number(u.balance) || 0), 0);
+    return users.reduce((acc, u) => acc + (Number(u.checkingBalance ?? u.balance) || 0) + (Number(u.savingsBalance) || 0), 0);
   }, [users]);
 
   return (
@@ -237,7 +260,7 @@ export default function AdminUsersPage() {
 
         <Dialog open={registerOpen} onOpenChange={(open) => {
           setRegisterOpen(open);
-          if (!open) setNewUserData({ fullName: '', email: '', password: '', balance: 5000 });
+          if (!open) setNewUserData({ fullName: '', email: '', password: '', checkingBalance: 5000, savingsBalance: 0, role: 'user' });
         }}>
           <DialogTrigger asChild>
             <Button className="gap-2 glow-indigo w-full md:w-auto">
@@ -279,11 +302,20 @@ export default function AdminUsersPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t.admin.initial_deposit} ($)</Label>
+                  <Label>Saldo Inicial Cheques ($)</Label>
                   <Input 
                     type="number"
-                    value={newUserData.balance}
-                    onChange={(e) => setNewUserData({...newUserData, balance: Number(e.target.value)})}
+                    value={newUserData.checkingBalance}
+                    onChange={(e) => setNewUserData({...newUserData, checkingBalance: Number(e.target.value)})}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Saldo Inicial Ahorros ($)</Label>
+                  <Input 
+                    type="number"
+                    value={newUserData.savingsBalance}
+                    onChange={(e) => setNewUserData({...newUserData, savingsBalance: Number(e.target.value)})}
                     required
                   />
                 </div>
@@ -361,7 +393,7 @@ export default function AdminUsersPage() {
                   <TableRow className="border-white/5">
                     <TableHead>{t.admin.col_user}</TableHead>
                     <TableHead className="hidden md:table-cell">{t.admin.col_email}</TableHead>
-                    <TableHead className="text-right">{t.admin.col_balance}</TableHead>
+                    <TableHead className="text-right">Total Consolidado</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -385,7 +417,10 @@ export default function AdminUsersPage() {
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground hidden md:table-cell">{u.email}</TableCell>
                       <TableCell className="text-right font-bold text-accent">
-                        ${(Number(u.balance) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ${((Number(u.checkingBalance ?? u.balance) || 0) + (Number(u.savingsBalance) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        <div className="text-[10px] text-muted-foreground font-normal">
+                          CHQ: ${(Number(u.checkingBalance ?? u.balance) || 0).toLocaleString()} | AHO: ${(Number(u.savingsBalance) || 0).toLocaleString()}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -437,8 +472,12 @@ export default function AdminUsersPage() {
                 <Input value={selectedUser.fullName} onChange={e => setSelectedUser({...selectedUser, fullName: e.target.value})} />
               </div>
               <div className="space-y-2">
-                <Label>{t.admin.balance}</Label>
-                <Input type="number" value={selectedUser.balance} onChange={e => setSelectedUser({...selectedUser, balance: e.target.value})} />
+                <Label>Saldo Cheques</Label>
+                <Input type="number" value={selectedUser.checkingBalance ?? selectedUser.balance ?? 0} onChange={e => setSelectedUser({...selectedUser, checkingBalance: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>Saldo Ahorros</Label>
+                <Input type="number" value={selectedUser.savingsBalance ?? 0} onChange={e => setSelectedUser({...selectedUser, savingsBalance: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>{t.admin.role || "Rol"}</Label>
@@ -478,6 +517,18 @@ export default function AdminUsersPage() {
           </DialogHeader>
           {selectedUser && (
             <form onSubmit={handleDeposit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Cuenta de Destino</Label>
+                <Select value={depositAccount} onValueChange={(val: 'checking' | 'savings') => setDepositAccount(val)}>
+                  <SelectTrigger className="bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="glass">
+                    <SelectItem value="checking">Cheques (Checking)</SelectItem>
+                    <SelectItem value="savings">Ahorros (Savings)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>{t.admin.amount_usd}</Label>
                 <div className="relative">

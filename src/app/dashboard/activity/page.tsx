@@ -175,7 +175,7 @@ export default function ActivityPage() {
                           <div className="flex flex-col">
                             <span className="text-sm">{tx.merchant}</span>
                             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                              <CreditCard size={10} /> {t.activity.aeon_network}
+                              <CreditCard size={10} /> {tx.account === 'savings' ? 'Ahorros ...9102' : 'Cheques ...8234'}
                             </span>
                           </div>
                         </div>

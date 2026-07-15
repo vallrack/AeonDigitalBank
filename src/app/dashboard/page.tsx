@@ -55,8 +55,12 @@ export default function DashboardPage() {
     }, { income: 0, expenses: 0 });
   }, [allTransactions]);
 
-  const realBalance = useMemo(() => {
-    return Number(userData?.balance || 0);
+  const checkingBalance = useMemo(() => {
+    return Number(userData?.checkingBalance ?? userData?.balance ?? 0);
+  }, [userData]);
+
+  const savingsBalance = useMemo(() => {
+    return Number(userData?.savingsBalance ?? 0);
   }, [userData]);
 
   const activityData = useMemo(() => {
@@ -145,14 +149,23 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <BalanceWidget 
-          balance={realBalance} 
-          income={totals.income}
-          expenses={totals.expenses}
-        />
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="flex flex-col gap-4">
+          <BalanceWidget 
+            title="Cheques"
+            accountNumber="...8234"
+            balance={checkingBalance} 
+            income={totals.income}
+            expenses={totals.expenses}
+          />
+          <BalanceWidget 
+            title="Ahorros"
+            accountNumber="...9102"
+            balance={savingsBalance} 
+          />
+        </div>
         
-        <Card className="md:col-span-2 glass border-primary/5">
+        <Card className="md:col-span-2 xl:col-span-3 glass border-primary/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
               <CardTitle className="text-base font-headline font-medium">{t.dashboard.weekly_activity}</CardTitle>

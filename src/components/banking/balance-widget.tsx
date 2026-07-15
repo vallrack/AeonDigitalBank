@@ -11,12 +11,16 @@ interface BalanceWidgetProps {
   balance?: number;
   income?: number;
   expenses?: number;
+  title?: string;
+  accountNumber?: string;
 }
 
 export function BalanceWidget({ 
   balance = 0, 
   income = 0, 
-  expenses = 0 
+  expenses = 0,
+  title,
+  accountNumber
 }: BalanceWidgetProps) {
   const { t } = useI18n();
 
@@ -35,9 +39,16 @@ export function BalanceWidget({
     <Card className="glass overflow-hidden relative border-primary/10 h-full flex flex-col">
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl" />
       <CardHeader className="pb-2">
-        <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2 uppercase tracking-tighter">
-          <Wallet size={14} className="text-primary" />
-          {t.dashboard.total_balance}
+        <CardTitle className="text-xs font-medium text-muted-foreground flex items-center justify-between uppercase tracking-tighter w-full">
+          <div className="flex items-center gap-2">
+            <Wallet size={14} className="text-primary" />
+            {title || t.dashboard.total_balance}
+          </div>
+          {accountNumber && (
+            <span className="text-[10px] text-muted-foreground/70 font-mono">
+              {accountNumber}
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col justify-between">

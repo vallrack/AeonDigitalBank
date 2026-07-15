@@ -109,6 +109,9 @@ export default function CardsPage() {
   // Ahora mostraremos todas las tarjetas juntas
   const allCards = cards || [];
 
+  // Comprobar si la promoción de la FIFA sigue activa (hasta 31 Julio 2026)
+  const isFifaPromoActive = new Date() <= new Date('2026-07-31T23:59:59');
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -158,7 +161,7 @@ export default function CardsPage() {
               {(selectedType === 'customized-cash' || selectedType === 'unlimited-cash') ? (
                 <div className="space-y-2 mt-4">
                   <Label>Seleccione el diseño de su tarjeta *</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  <div className={cn("grid grid-cols-1 gap-4 mt-2", isFifaPromoActive ? "md:grid-cols-2" : "md:grid-cols-1 max-w-sm mx-auto")}>
                      <div 
                        className={cn("border rounded-xl p-4 cursor-pointer flex flex-col gap-2 relative bg-white/5 hover:bg-white/10 transition-colors", selectedVariant === 'standard' ? "border-[#1d4ed8] ring-1 ring-[#1d4ed8]" : "border-white/10")}
                        onClick={() => setSelectedVariant('standard')}
@@ -182,29 +185,31 @@ export default function CardsPage() {
                        />
                      </div>
 
-                     <div 
-                       className={cn("border rounded-xl p-4 cursor-pointer flex flex-col gap-2 relative bg-white/5 hover:bg-white/10 transition-colors", selectedVariant === 'fifa' ? "border-[#1d4ed8] ring-1 ring-[#1d4ed8]" : "border-white/10")}
-                       onClick={() => setSelectedVariant('fifa')}
-                     >
-                       <div className="flex items-center gap-3 mb-2">
-                         <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0", selectedVariant === 'fifa' ? "border-[#1d4ed8]" : "border-gray-400")}>
-                           {selectedVariant === 'fifa' && <div className="w-2.5 h-2.5 bg-[#1d4ed8] rounded-full" />}
+                     {isFifaPromoActive && (
+                       <div 
+                         className={cn("border rounded-xl p-4 cursor-pointer flex flex-col gap-2 relative bg-white/5 hover:bg-white/10 transition-colors", selectedVariant === 'fifa' ? "border-[#1d4ed8] ring-1 ring-[#1d4ed8]" : "border-white/10")}
+                         onClick={() => setSelectedVariant('fifa')}
+                       >
+                         <div className="flex items-center gap-3 mb-2">
+                           <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0", selectedVariant === 'fifa' ? "border-[#1d4ed8]" : "border-gray-400")}>
+                             {selectedVariant === 'fifa' && <div className="w-2.5 h-2.5 bg-[#1d4ed8] rounded-full" />}
+                           </div>
+                           <span className="font-semibold text-sm">Copa Mundial de la FIFA 2026™</span>
                          </div>
-                         <span className="font-semibold text-sm">Copa Mundial de la FIFA 2026™</span>
+                         <VirtualCard 
+                            cardHolder={(user?.displayName || "VALUED CUSTOMER").toUpperCase()}
+                            cardNumber="•••• •••• •••• 1234"
+                            expiryDate="12/28"
+                            cvv="***"
+                            type={selectedType}
+                            variant="fifa"
+                            showNumbersOnFront={false}
+                            interactive={false}
+                            className="w-full pointer-events-none"
+                         />
+                         <span className="text-xs text-muted-foreground text-center mt-2">Solo estará disponible hasta el 31 de julio de 2026</span>
                        </div>
-                       <VirtualCard 
-                          cardHolder={(user?.displayName || "VALUED CUSTOMER").toUpperCase()}
-                          cardNumber="•••• •••• •••• 1234"
-                          expiryDate="12/28"
-                          cvv="***"
-                          type={selectedType}
-                          variant="fifa"
-                          showNumbersOnFront={false}
-                          interactive={false}
-                          className="w-full pointer-events-none"
-                       />
-                       <span className="text-xs text-muted-foreground text-center mt-2">Solo estará disponible hasta el 31 de julio de 2026</span>
-                     </div>
+                     )}
                   </div>
                 </div>
               ) : (
