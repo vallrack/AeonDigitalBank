@@ -3,7 +3,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
-import { collection, query, orderBy, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, addDoc, increment } from 'firebase/firestore';
+import { collection, query, orderBy, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, addDoc, increment, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +26,8 @@ import {
   AlertOctagon,
   CheckCircle2,
   XCircle,
-  ShieldAlert
+  ShieldAlert,
+  FileText
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -67,6 +68,9 @@ export default function AdminUsersPage() {
   const [depositAmount, setDepositAmount] = useState('');
 
   const [depositAccount, setDepositAccount] = useState<'checking' | 'savings'>('checking');
+  const [kycOpen, setKycOpen] = useState(false);
+  const [kycData, setKycData] = useState<{ idPhoto: string; facePhoto: string; userName: string } | null>(null);
+  const [kycLoading, setKycLoading] = useState(false);
 
   const [newUserData, setNewUserData] = useState({
     fullName: '',
@@ -235,6 +239,26 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleViewKyc = async (u: any) => {
+    setKycLoading(true);
+    setKycData(null);
+    setKycOpen(true);
+    try {
+      const snap = await getDoc(doc(db, 'users', u.id));
+      const data = snap.data();
+      setKycData({
+        idPhoto: data?.kycIdPhoto || '',
+        facePhoto: data?.kycFacePhoto || '',
+        userName: u.fullName
+      });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los documentos KYC.' });
+      setKycOpen(false);
+    } finally {
+      setKycLoading(false);
+    }
+  };
+
   const handleActivateAccount = async (u: any) => {
     try {
       await updateDoc(doc(db, 'users', u.id), {
@@ -378,6 +402,52 @@ export default function AdminUsersPage() {
           </div>
           <p className="text-muted-foreground">{t.admin.subtitle}</p>
         </div>
+
+        {/* KYC Document Viewer Dialog */}
+        <Dialog open={kycOpen} onOpenChange={setKycOpen}>
+          <DialogContent className="glass border-white/10 sm:max-w-[700px]">
+            <DialogHeader>
+              <DialogTitle className="font-headline text-xl flex items-center gap-2">
+                <FileText className="text-primary" size={20} />
+                Documentos KYC — {kycData?.userName}
+              </DialogTitle>
+              <DialogDescription>Documentos de identidad enviados durante el registro.</DialogDescription>
+            </DialogHeader>
+            {kycLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="animate-spin text-primary" size={36} />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Documento de Identidad</p>
+                  {kycData?.idPhoto && !kycData.idPhoto.startsWith('pdf:') ? (
+                    <img src={kycData.idPhoto} alt="ID Document" className="w-full rounded-lg border border-white/10 object-contain max-h-72" />
+                  ) : kycData?.idPhoto?.startsWith('pdf:') ? (
+                    <div className="flex flex-col items-center justify-center h-40 border border-dashed border-white/20 rounded-lg text-muted-foreground gap-2">
+                      <FileText size={32} />
+                      <p className="text-sm">PDF subido: {kycData.idPhoto.split(':')[1]}</p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-40 border border-dashed border-white/20 rounded-lg text-muted-foreground">
+                      <p className="text-sm">Sin documento</p>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Selfie de Verificación</p>
+                  {kycData?.facePhoto ? (
+                    <img src={kycData.facePhoto} alt="Selfie" className="w-full rounded-lg border border-white/10 object-contain max-h-72" />
+                  ) : (
+                    <div className="flex items-center justify-center h-40 border border-dashed border-white/20 rounded-lg text-muted-foreground">
+                      <p className="text-sm">Sin selfie</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={registerOpen} onOpenChange={(open) => {
           setRegisterOpen(open);
@@ -609,6 +679,9 @@ export default function AdminUsersPage() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setSelectedUser(u); setDepositOpen(true); }}>
                                   <ArrowUpCircle className="mr-2 h-4 w-4 text-emerald-500" /> {t.admin.deposit}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleViewKyc(u)} className="text-blue-600 focus:text-blue-600 focus:bg-blue-50">
+                                  <FileText className="mr-2 h-4 w-4" /> Ver KYC / Documentos
                                 </DropdownMenuItem>
                                 {u.id !== currentUser?.uid && (
                                   <>
