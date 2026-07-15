@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -14,15 +14,73 @@ import { toast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useI18n } from '@/lib/i18n/context';
 import { VirtualCard } from '@/components/banking/virtual-card';
+import { decryptLocalData } from '@/lib/webauthn';
+import { Fingerprint } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [bioAuthData, setBioAuthData] = useState<{ email: string, enc: string, id: string } | null>(null);
+  const [isBioLoading, setIsBioLoading] = useState(false);
   const auth = useAuth();
   const router = useRouter();
   const { t } = useI18n();
+
+  useEffect(() => {
+    const stored = localStorage.getItem('AeonBank_BioAuth');
+    if (stored) {
+      try {
+        setBioAuthData(JSON.parse(stored));
+      } catch (e) {
+        localStorage.removeItem('AeonBank_BioAuth');
+      }
+    }
+  }, []);
+
+  const handleBiometricLogin = async () => {
+    if (!bioAuthData) return;
+    setIsBioLoading(true);
+    setErrorMessage(null);
+
+    try {
+      if (!window.PublicKeyCredential) throw new Error('Biometría no soportada');
+      
+      const credential = await navigator.credentials.get({
+        publicKey: {
+          challenge: new Uint8Array(32), // Dummy challenge for demo
+          allowCredentials: [{
+            id: Uint8Array.from(atob(bioAuthData.id), c => c.charCodeAt(0)),
+            type: 'public-key'
+          }],
+          timeout: 60000,
+          userVerification: 'required'
+        }
+      });
+
+      if (credential) {
+        const dec = decryptLocalData(bioAuthData.enc);
+        if (!dec) throw new Error('Error de desencriptación local');
+        
+        await signInWithEmailAndPassword(auth, bioAuthData.email, dec);
+        
+        toast({ title: t.auth.login_success, description: "Sesión iniciada con huella dactilar" });
+        router.push('/dashboard');
+      }
+    } catch (error: any) {
+      console.error(error);
+      setErrorMessage("La verificación biométrica falló o fue cancelada.");
+      toast({ variant: "destructive", title: "Error", description: "Verificación biométrica fallida." });
+    } finally {
+      setIsBioLoading(false);
+    }
+  };
+
+  const handleClearBiometrics = () => {
+    localStorage.removeItem('AeonBank_BioAuth');
+    setBioAuthData(null);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,56 +156,86 @@ export default function LoginPage() {
               </Alert>
             )}
             
-            <div className="space-y-1">
-              <Label htmlFor="email" className="text-slate-700 font-semibold text-xs tracking-wider">ID de usuario</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                className="bg-white border-slate-300 text-slate-900 focus-visible:ring-1 focus-visible:ring-[#012169] rounded-sm py-5" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="space-y-1">
-              <Label htmlFor="password" className="text-slate-700 font-semibold text-xs tracking-wider">Contraseña</Label>
-              <Input 
-                id="password" 
-                type="password"
-                className="bg-white border-slate-300 text-slate-900 focus-visible:ring-1 focus-visible:ring-[#012169] rounded-sm py-5" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="flex items-center space-x-2 pt-2">
-              <input type="checkbox" id="saveId" className="rounded-sm border-slate-400 w-4 h-4 text-[#012169] focus:ring-[#012169]" />
-              <label htmlFor="saveId" className="text-sm text-slate-700">Guardar ID de usuario</label>
-            </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full bg-[#012169] hover:bg-[#001440] text-white py-6 text-base rounded-md font-semibold transition-colors mt-6 shadow-md" 
-              disabled={isLoading}
-            >
-              {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : 'Iniciar una sesión'}
-            </Button>
-            
-            <div className="flex flex-wrap items-center gap-3 text-xs mt-6 px-1">
-              <Link href="#" className="text-[#012169] hover:underline">Olvidé la ID/Contraseña</Link>
-              <span className="text-slate-300">|</span>
-              <Link href="#" className="text-[#012169] hover:underline">Seguridad y ayuda</Link>
-              <span className="text-slate-300">|</span>
-              <Link href="/register" className="text-[#012169] hover:underline">Inscribirse</Link>
-            </div>
-            
-            <div className="mt-8 pt-8 border-t border-slate-200">
-               <Button variant="outline" className="w-full border-slate-300 text-[#012169] hover:bg-slate-50 py-6 font-semibold rounded-md shadow-sm" asChild>
-                 <Link href="/register">Abrir una cuenta</Link>
-               </Button>
-            </div>
+            {bioAuthData ? (
+              <div className="flex flex-col items-center justify-center space-y-6 py-6">
+                <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 mb-2">
+                  <Fingerprint size={40} />
+                </div>
+                <div className="text-center">
+                  <p className="text-slate-500 text-sm mb-1">Bienvenido de nuevo</p>
+                  <p className="text-lg font-medium text-slate-800">{bioAuthData.email}</p>
+                </div>
+                <Button 
+                  type="button" 
+                  onClick={handleBiometricLogin}
+                  disabled={isBioLoading}
+                  className="w-full bg-[#012169] hover:bg-[#001440] text-white py-6 text-base rounded-md font-semibold transition-colors shadow-md gap-2"
+                >
+                  {isBioLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <Fingerprint className="h-5 w-5" />}
+                  Iniciar sesión con Huella
+                </Button>
+                <button 
+                  type="button" 
+                  onClick={handleClearBiometrics}
+                  className="text-sm text-slate-500 hover:text-slate-800 underline mt-4"
+                >
+                  Ingresar con otra cuenta
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <Label htmlFor="email" className="text-slate-700 font-semibold text-xs tracking-wider">ID de usuario</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    className="bg-white border-slate-300 text-slate-900 focus-visible:ring-1 focus-visible:ring-[#012169] rounded-sm py-5" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <Label htmlFor="password" className="text-slate-700 font-semibold text-xs tracking-wider">Contraseña</Label>
+                  <Input 
+                    id="password" 
+                    type="password"
+                    className="bg-white border-slate-300 text-slate-900 focus-visible:ring-1 focus-visible:ring-[#012169] rounded-sm py-5" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                
+                <div className="flex items-center space-x-2 pt-2">
+                  <input type="checkbox" id="saveId" className="rounded-sm border-slate-400 w-4 h-4 text-[#012169] focus:ring-[#012169]" />
+                  <label htmlFor="saveId" className="text-sm text-slate-700">Guardar ID de usuario</label>
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  className="w-full bg-[#012169] hover:bg-[#001440] text-white py-6 text-base rounded-md font-semibold transition-colors mt-6 shadow-md" 
+                  disabled={isLoading}
+                >
+                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : 'Iniciar una sesión'}
+                </Button>
+                
+                <div className="flex flex-wrap items-center gap-3 text-xs mt-6 px-1">
+                  <Link href="#" className="text-[#012169] hover:underline">Olvidé la ID/Contraseña</Link>
+                  <span className="text-slate-300">|</span>
+                  <Link href="#" className="text-[#012169] hover:underline">Seguridad y ayuda</Link>
+                  <span className="text-slate-300">|</span>
+                  <Link href="/register" className="text-[#012169] hover:underline">Inscribirse</Link>
+                </div>
+                
+                <div className="mt-8 pt-8 border-t border-slate-200">
+                   <Button variant="outline" className="w-full border-slate-300 text-[#012169] hover:bg-slate-50 py-6 font-semibold rounded-md shadow-sm" asChild>
+                     <Link href="/register">Abrir una cuenta</Link>
+                   </Button>
+                </div>
+              </>
+            )}
           </form>
         </div>
       </div>

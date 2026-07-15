@@ -14,7 +14,9 @@ import { useAuth, useUser, useFirestore, useDoc } from '@/firebase';
 import { updatePassword } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useI18n } from '@/lib/i18n/context';
-import { registerBiometrics } from '@/lib/webauthn';
+import { registerBiometrics, encryptLocalData } from '@/lib/webauthn';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function SecurityPage() {
   const { user } = useUser();
@@ -25,6 +27,8 @@ export default function SecurityPage() {
   const [newPassword, setNewPassword] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isBioLoading, setIsBioLoading] = useState(false);
+  const [bioPasswordOpen, setBioPasswordOpen] = useState(false);
+  const [bioPassword, setBioPassword] = useState('');
 
   const handleUpdatePassword = async () => {
     if (!newPassword || newPassword.length < 6) {
@@ -56,30 +60,64 @@ export default function SecurityPage() {
 
   const handleToggleBiometrics = async (checked: boolean) => {
     if (!user) return;
-    setIsBioLoading(true);
+    
+    if (checked) {
+      // Turn ON biometrics requires password confirmation first
+      setBioPasswordOpen(true);
+      return;
+    }
 
+    // Turn OFF biometrics
+    setIsBioLoading(true);
     try {
-      if (checked) {
-        // Turn ON biometrics
-        const credentialId = await registerBiometrics(user.uid, user.email || 'user');
-        await updateDoc(doc(db, 'users', user.uid), {
-          biometricsEnabled: true,
-          biometricCredentialId: credentialId
-        });
-        toast({ title: "Biometría Activada", description: "Tu dispositivo ha sido enlazado exitosamente." });
-      } else {
-        // Turn OFF biometrics
-        await updateDoc(doc(db, 'users', user.uid), {
-          biometricsEnabled: false,
-          biometricCredentialId: null
-        });
-        toast({ title: "Biometría Desactivada" });
-      }
+      await updateDoc(doc(db, 'users', user.uid), {
+        biometricsEnabled: false,
+        biometricCredentialId: null
+      });
+      localStorage.removeItem('AeonBank_BioAuth');
+      toast({ title: "Biometría Desactivada" });
     } catch (error: any) {
+      toast({ variant: "destructive", title: t.common.error, description: error.message });
+    } finally {
+      setIsBioLoading(false);
+    }
+  };
+
+  const handleConfirmBioPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !user.email) return;
+    
+    setIsBioLoading(true);
+    try {
+      // 1. Verify password is correct by re-authenticating
+      await signInWithEmailAndPassword(auth, user.email, bioPassword);
+      
+      // 2. Register WebAuthn passkey
+      const credentialId = await registerBiometrics(user.uid, user.email);
+      
+      // 3. Update Firestore
+      await updateDoc(doc(db, 'users', user.uid), {
+        biometricsEnabled: true,
+        biometricCredentialId: credentialId
+      });
+
+      // 4. Store encrypted credential locally
+      const encryptedPassword = encryptLocalData(bioPassword);
+      localStorage.setItem('AeonBank_BioAuth', JSON.stringify({
+        email: user.email,
+        enc: encryptedPassword,
+        id: credentialId
+      }));
+
+      toast({ title: "Biometría Activada", description: "Tu dispositivo ha sido enlazado exitosamente." });
+      setBioPasswordOpen(false);
+      setBioPassword('');
+    } catch (error: any) {
+      console.error(error);
       toast({
         variant: "destructive",
-        title: t.common.error,
-        description: error.message || "Fallo en registro biométrico."
+        title: "Error de Verificación",
+        description: "Contraseña incorrecta o registro biométrico cancelado."
       });
     } finally {
       setIsBioLoading(false);
@@ -209,6 +247,35 @@ export default function SecurityPage() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={bioPasswordOpen} onOpenChange={setBioPasswordOpen}>
+        <DialogContent className="glass border-white/10 sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar Identidad</DialogTitle>
+            <DialogDescription>
+              Por seguridad, ingresa tu contraseña actual para habilitar el acceso con huella o rostro.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleConfirmBioPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Contraseña</Label>
+              <Input 
+                type="password" 
+                value={bioPassword} 
+                onChange={e => setBioPassword(e.target.value)}
+                placeholder="Ingresa tu contraseña"
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setBioPasswordOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={isBioLoading} className="glow-indigo">
+                {isBioLoading ? "Verificando..." : "Confirmar y Activar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

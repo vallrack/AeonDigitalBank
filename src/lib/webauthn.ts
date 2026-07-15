@@ -19,6 +19,31 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+// Educational Note: In a real production bank, this would use secure Web Crypto API with 
+// hardware-backed keys, or a backend Custom Token. For this demo, we use a simple XOR cipher + Base64.
+const SECRET_KEY = "AeonDigitalBank_SecretKey_2026";
+
+export function encryptLocalData(text: string): string {
+  let result = '';
+  for (let i = 0; i < text.length; i++) {
+    result += String.fromCharCode(text.charCodeAt(i) ^ SECRET_KEY.charCodeAt(i % SECRET_KEY.length));
+  }
+  return window.btoa(encodeURIComponent(result));
+}
+
+export function decryptLocalData(encryptedText: string): string {
+  try {
+    const decoded = decodeURIComponent(window.atob(encryptedText));
+    let result = '';
+    for (let i = 0; i < decoded.length; i++) {
+      result += String.fromCharCode(decoded.charCodeAt(i) ^ SECRET_KEY.charCodeAt(i % SECRET_KEY.length));
+    }
+    return result;
+  } catch (e) {
+    return '';
+  }
+}
+
 export async function registerBiometrics(userId: string, email: string): Promise<string> {
   if (!window.PublicKeyCredential) {
     throw new Error('Biometrics not supported on this device/browser.');
