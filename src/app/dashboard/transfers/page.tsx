@@ -44,6 +44,13 @@ export default function TransfersPage() {
   const [otpCode, setOtpCode] = useState('');
   const [isAuthVerifying, setIsAuthVerifying] = useState(false);
   const [useOtpFallback, setUseOtpFallback] = useState(false);
+  const [hasBiometrics, setHasBiometrics] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setHasBiometrics(!!localStorage.getItem('AeonBank_BioAuth'));
+    }
+  }, []);
 
   // Internal Transfer State
   const [internalAmount, setInternalAmount] = useState('');
@@ -563,7 +570,7 @@ export default function TransfersPage() {
             </DialogDescription>
           </DialogHeader>
           
-          {localStorage.getItem('AeonBank_BioAuth') && !useOtpFallback ? (
+          {hasBiometrics && !useOtpFallback ? (
             <div className="flex flex-col items-center justify-center space-y-4 py-6">
               <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mb-2">
                 <Fingerprint size={32} />
