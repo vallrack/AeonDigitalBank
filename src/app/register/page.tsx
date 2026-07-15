@@ -226,8 +226,14 @@ export default function RegisterPage() {
         createdAt: new Date().toISOString(),
         checkingBalance: 0,
         savingsBalance: 0,
-        kycIdPhoto: compressedId,
-        kycFacePhoto: compressedFace
+        hasKyc: true // lightweight flag only
+      });
+
+      // Save KYC images in a SEPARATE subcollection to avoid slowing down user list queries
+      await setDoc(doc(db, 'users', user.uid, 'kyc', 'documents'), {
+        idPhoto: compressedId,
+        facePhoto: compressedFace,
+        uploadedAt: new Date().toISOString()
       });
 
       // Generate the initial Virtual Card requested by the user

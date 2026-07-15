@@ -244,13 +244,25 @@ export default function AdminUsersPage() {
     setKycData(null);
     setKycOpen(true);
     try {
-      const snap = await getDoc(doc(db, 'users', u.id));
-      const data = snap.data();
-      setKycData({
-        idPhoto: data?.kycIdPhoto || '',
-        facePhoto: data?.kycFacePhoto || '',
-        userName: u.fullName
-      });
+      // Try new subcollection first (kyc/documents)
+      const kycSnap = await getDoc(doc(db, 'users', u.id, 'kyc', 'documents'));
+      if (kycSnap.exists()) {
+        const data = kycSnap.data();
+        setKycData({
+          idPhoto: data?.idPhoto || '',
+          facePhoto: data?.facePhoto || '',
+          userName: u.fullName
+        });
+      } else {
+        // Fallback: old format stored in main user doc
+        const userSnap = await getDoc(doc(db, 'users', u.id));
+        const data = userSnap.data();
+        setKycData({
+          idPhoto: data?.kycIdPhoto || '',
+          facePhoto: data?.kycFacePhoto || '',
+          userName: u.fullName
+        });
+      }
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los documentos KYC.' });
       setKycOpen(false);
