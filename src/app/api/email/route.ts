@@ -159,6 +159,63 @@ export async function POST(req: Request) {
         </body>
         </html>
       `;
+    } else if (type === 'deposit') {
+      subject = `Depósito recibido: +${formattedAmount} en tu cuenta`;
+      htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head><style>${baseStyles}</style></head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Bank of Americans</h1>
+            </div>
+            <div class="content">
+              <p>¡Hola ${to.name}!</p>
+              <p>Se ha acreditado un depósito en tu cuenta.</p>
+              <div class="amount green">+${formattedAmount}</div>
+              <div class="details">
+                <div class="detail-row"><span class="detail-label">Cuenta:</span> <span class="detail-value">${data.account || 'Cuenta'}</span></div>
+                <div class="detail-row"><span class="detail-label">Fecha:</span> <span class="detail-value">${data.date ? new Date(data.date).toLocaleString() : new Date().toLocaleString()}</span></div>
+                <div class="detail-row"><span class="detail-label">Estado:</span> <span class="detail-value">Acreditado</span></div>
+              </div>
+              <p>Los fondos ya están disponibles en tu cuenta Bank of Americans.</p>
+            </div>
+            <div class="footer">
+              Este es un correo automático. Por favor no respondas a este mensaje.
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+    } else if (type === 'pending') {
+      subject = `Tu solicitud de cuenta está en revisión - Bank of Americans`;
+      htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head><style>${baseStyles}</style></head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Bank of Americans</h1>
+            </div>
+            <div class="content">
+              <p>Hola ${to.name},</p>
+              <p>Hemos recibido tu solicitud de registro y tus documentos están siendo verificados por nuestro equipo de seguridad.</p>
+              <div class="amount yellow">En Revisión</div>
+              <div class="details">
+                <div class="detail-row"><span class="detail-label">Estado:</span> <span class="detail-value">Pendiente de verificación</span></div>
+                <div class="detail-row"><span class="detail-label">Tiempo estimado:</span> <span class="detail-value">Hasta 6 horas</span></div>
+              </div>
+              <p>Una vez que tu cuenta sea activada, recibirás un correo de confirmación y podrás acceder a todos los servicios de Bank of Americans.</p>
+            </div>
+            <div class="footer">
+              El equipo de Bank of Americans.
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
     }
 
     const brevoPayload = {

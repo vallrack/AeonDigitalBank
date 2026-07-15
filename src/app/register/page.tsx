@@ -259,6 +259,31 @@ export default function RegisterPage() {
           : "Tu cuenta será activada en un lapso de 6 horas por seguridad.",
       });
 
+      // Send registration emails
+      if (!isAdmin) {
+        fetch('/api/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: { email: formData.email, name: formData.fullName },
+            type: 'pending'
+          })
+        }).catch(console.error);
+      } else {
+        fetch('/api/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: { email: formData.email, name: formData.fullName },
+            type: 'welcome',
+            data: {
+              name: formData.fullName,
+              activationDate: new Date().toISOString()
+            }
+          })
+        }).catch(console.error);
+      }
+
       setStep(4);
     } catch (error: any) {
       console.error("Registration error:", error);
