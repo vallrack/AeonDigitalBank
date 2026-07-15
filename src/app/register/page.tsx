@@ -57,8 +57,9 @@ export default function RegisterPage() {
 
   // Convert PDF first page to a compressed JPEG image using PDF.js
   const pdfToImage = async (file: File): Promise<string> => {
-    const pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    // Use legacy build to avoid Next.js worker bundling issues
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs' as any);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs`;
 
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;

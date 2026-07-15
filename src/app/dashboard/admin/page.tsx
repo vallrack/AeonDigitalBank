@@ -289,6 +289,23 @@ export default function AdminUsersPage() {
       toast({ title: t.admin.deposit + " " + t.common.success });
       setDepositOpen(false);
       setDepositAmount('');
+
+      // Send deposit notification email
+      fetch('/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: { email: selectedUser.email, name: selectedUser.fullName },
+          type: 'deposit',
+          data: {
+            amount: numAmount,
+            account: depositAccount === 'checking' ? 'Cuenta Corriente' : 'Cuenta de Ahorros',
+            date: new Date().toISOString(),
+            name: selectedUser.fullName
+          }
+        })
+      }).catch(console.error);
+
       setSelectedUser(null);
     } catch (error: any) {
       toast({
