@@ -240,7 +240,9 @@ export default function CardsPage() {
                     <SelectItem value="unlimited-cash">Unlimited Cash Rewards (Gris/Plata)</SelectItem>
                     <SelectItem value="travel-rewards">Travel Rewards (Azul oscuro)</SelectItem>
                     <SelectItem value="bankamericard">BankAmericard (Blanca)</SelectItem>
-                    <SelectItem value="custom">Diseño Personalizado (Custom)</SelectItem>
+                    {userData?.role === 'admin' && (
+                      <SelectItem value="custom">Diseño Personalizado (Custom)</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
