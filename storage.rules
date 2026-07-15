@@ -10,12 +10,14 @@ service firebase.storage {
       return isSignedIn() && request.auth.token.role == 'admin';
     }
 
-    match /{allPaths=**} {
-      allow read, write: if isAdmin();
-    }
-
+    // Users can read/write their own files (e.g. KYC docs)
     match /users/{userId}/{allPaths=**} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Admins can access everything else
+    match /{allPaths=**} {
+      allow read, write: if isAdmin();
     }
   }
 }

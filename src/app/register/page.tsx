@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { ref, uploadString } from 'firebase/storage';
-import { useAuth, useFirestore, useStorage } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useI18n } from '@/lib/i18n/context';
@@ -23,7 +23,6 @@ export default function RegisterPage() {
   const router = useRouter();
   const auth = useAuth();
   const db = useFirestore();
-  const storage = useStorage();
   const { t } = useI18n();
   const [step, setStep] = useState(1);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -64,6 +63,23 @@ export default function RegisterPage() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  // Compress image to stay under Firestore 1MB doc limit
+  const compressImage = (dataUrl: string, maxWidth = 400, quality = 0.6): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(maxWidth / img.width, 1);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = dataUrl;
+    });
   };
 
   const startCamera = async () => {
@@ -133,17 +149,13 @@ export default function RegisterPage() {
 
       await updateProfile(user, { displayName: formData.fullName });
 
-      // Upload KYC Docs to Storage
-      if (idPhoto) {
-        const idRef = ref(storage, `users/${user.uid}/kyc/id_document.jpg`);
-        await uploadString(idRef, idPhoto, 'data_url');
-      }
-      if (facePhoto) {
-        const faceRef = ref(storage, `users/${user.uid}/kyc/selfie.jpg`);
-        await uploadString(faceRef, facePhoto, 'data_url');
-      }
+      // Save compressed KYC images directly to Firestore (no Storage needed)
+      let compressedId = '';
+      let compressedFace = '';
+      if (idPhoto) compressedId = await compressImage(idPhoto);
+      if (facePhoto) compressedFace = await compressImage(facePhoto);
 
-      // Create user profile in Firestore directly since we don't have a backend function
+      // Create user profile in Firestore
       const isAdmin = formData.email === 'vallrack67@gmail.com';
       const userRole = isAdmin ? 'admin' : 'user';
       
@@ -160,7 +172,9 @@ export default function RegisterPage() {
         activationTime: activationTime.toISOString(),
         createdAt: new Date().toISOString(),
         checkingBalance: 0,
-        savingsBalance: 0
+        savingsBalance: 0,
+        kycIdPhoto: compressedId,
+        kycFacePhoto: compressedFace
       });
 
       // Generate the initial Virtual Card requested by the user

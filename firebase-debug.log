@@ -1,0 +1,58 @@
+[debug] [2026-07-15T19:44:23.178Z] ----------------------------------------------------------------------
+[debug] [2026-07-15T19:44:23.181Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\DOCENTE\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only storage --project fakebank-a7323
+[debug] [2026-07-15T19:44:23.181Z] CLI Version:   15.23.0
+[debug] [2026-07-15T19:44:23.181Z] Platform:      win32
+[debug] [2026-07-15T19:44:23.182Z] Node Version:  v24.14.0
+[debug] [2026-07-15T19:44:23.182Z] Detected Agent: antigravity
+[debug] [2026-07-15T19:44:23.182Z] Time:          Wed Jul 15 2026 14:44:23 GMT-0500 (hora estándar de Colombia)
+[debug] [2026-07-15T19:44:23.182Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-15T19:44:27.379Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-15T19:44:27.379Z] > authorizing via signed-in user (jdmoralescorproe@gmail.com)
+[debug] [2026-07-15T19:44:27.379Z] [iam] checking project fakebank-a7323 for permissions ["firebase.projects.get","firebaserules.releases.create","firebaserules.releases.update","firebaserules.rulesets.create"]
+[debug] [2026-07-15T19:44:27.394Z] Checked if tokens are valid: false, expires at: 1784060939722
+[debug] [2026-07-15T19:44:27.395Z] Checked if tokens are valid: false, expires at: 1784060939722
+[debug] [2026-07-15T19:44:27.395Z] > refreshing access token with scopes: []
+[debug] [2026-07-15T19:44:27.397Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-07-15T19:44:27.397Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-07-15T19:44:38.188Z] *** [apiv2] error from fetch(https://www.googleapis.com/oauth2/v3/token, {"headers":{},"method":"POST","body":{"type":"Buffer","data":[45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,98,101,54,48,50,50,99,54,50,56,56,97,53,49,55,53,55,54,55,56,100,97,49,101,13,10,67,111,110,116,101,110,116,45,68,105,115,112,111,115,105,116,105,111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,109,101,61,34,114,101,102,114,101,115,104,95,116,111,107,101,110,34,13,10,13,10,49,47,47,48,53,120,95,73,84,71,85,72,75,56,122,82,67,103,89,73,65,82,65,65,71,65,85,83,78,119,70,45,76,57,73,114,80,67,112,82,117,68,48,121,114,121,98,73,112,84,116,80,56,82,89,89,79,83,119,110,56,69,52,121,117,56,101,111,49,52,73,76,57,118,65,66,90,89,48,71,97,81,107,52,106,45,68,119,121,78,80,56,97,83,95,82,116,89,116,56,117,83,52,13,10,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,98,101,54,48,50,50,99,54,50,56,56,97,53,49,55,53,55,54,55,56,100,97,49,101,13,10,67,111,110,116,101,110,116,45,68,105,115,112,111,115,105,116,105,111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,109,101,61,34,99,108,105,101,110,116,95,105,100,34,13,10,13,10,53,54,51,53,56,52,51,51,53,56,54,57,45,102,103,114,104,103,109,100,52,55,98,113,110,101,107,105,106,53,105,56,98,53,112,114,48,51,104,111,56,52,57,101,54,46,97,112,112,115,46,103,111,111,103,108,101,117,115,101,114,99,111,110,116,101,110,116,46,99,111,109,13,10,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,98,101,54,48,50,50,99,54,50,56,56,97,53,49,55,53,55,54,55,56,100,97,49,101,13,10,67,111,110,116,101,110,116,45,68,105,115,112,111,115,105,116,105,111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,109,101,61,34,99,108,105,101,110,116,95,115,101,99,114,101,116,34,13,10,13,10,106,57,105,86,90,102,83,56,107,107,67,69,70,85,80,97,65,101,74,86,48,115,65,105,13,10,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,98,101,54,48,50,50,99,54,50,56,56,97,53,49,55,53,55,54,55,56,100,97,49,101,13,10,67,111,110,116,101,110,116,45,68,105,115,112,111,115,105,116,105,111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,109,101,61,34,103,114,97,110,116,95,116,121,112,101,34,13,10,13,10,114,101,102,114,101,115,104,95,116,111,107,101,110,13,10,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,98,101,54,48,50,50,99,54,50,56,56,97,53,49,55,53,55,54,55,56,100,97,49,101,13,10,67,111,110,116,101,110,116,45,68,105,115,112,111,115,105,116,105,111,110,58,32,102,111,114,109,45,100,97,116,97,59,32,110,97,109,101,61,34,115,99,111,112,101,34,13,10,13,10,13,10,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,45,98,101,54,48,50,50,99,54,50,56,56,97,53,49,55,53,55,54,55,56,100,97,49,101,45,45,13,10]}}): ConnectTimeoutError: Connect Timeout Error (attempted addresses: 216.239.38.223:443, 216.239.36.223:443, 216.239.34.223:443, 216.239.32.223:443, timeout: 10000ms)
+[error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[debug] [2026-07-15T19:44:38.189Z] [iam] error while checking permissions, command may fail: Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[info] 
+[info] === Deploying to 'fakebank-a7323'...
+[info] 
+[info] i  deploying storage 
+[info] i  storage: ensuring required API firebasestorage.googleapis.com is enabled... 
+[debug] [2026-07-15T19:44:38.200Z] Checked if tokens are valid: false, expires at: 1784060939722
+[debug] [2026-07-15T19:44:38.201Z] Checked if tokens are valid: false, expires at: 1784060939722
+[debug] [2026-07-15T19:44:38.201Z] > refreshing access token with scopes: []
+[debug] [2026-07-15T19:44:38.202Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-07-15T19:44:38.202Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-07-15T19:44:40.162Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-07-15T19:44:40.163Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-07-15T19:44:40.188Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/fakebank-a7323/services/firebasestorage.googleapis.com [none]
+[debug] [2026-07-15T19:44:40.189Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/fakebank-a7323/services/firebasestorage.googleapis.com  x-goog-user-project=fakebank-a7323
+[debug] [2026-07-15T19:44:41.086Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/fakebank-a7323/services/firebasestorage.googleapis.com 200
+[debug] [2026-07-15T19:44:41.087Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/fakebank-a7323/services/firebasestorage.googleapis.com [omitted]
+[warn] !  storage: missing required API firebasestorage.googleapis.com. Enabling now... 
+[debug] [2026-07-15T19:44:41.087Z] Checked if tokens are valid: true, expires at: 1784148279163
+[debug] [2026-07-15T19:44:41.087Z] Checked if tokens are valid: true, expires at: 1784148279163
+[debug] [2026-07-15T19:44:41.087Z] >>> [apiv2][query] POST https://serviceusage.googleapis.com/v1/projects/fakebank-a7323/services/firebasestorage.googleapis.com:enable [none]
+[debug] [2026-07-15T19:44:41.087Z] >>> [apiv2][(partial)header] POST https://serviceusage.googleapis.com/v1/projects/fakebank-a7323/services/firebasestorage.googleapis.com:enable  x-goog-user-project=fakebank-a7323
+[debug] [2026-07-15T19:44:41.746Z] <<< [apiv2][status] POST https://serviceusage.googleapis.com/v1/projects/fakebank-a7323/services/firebasestorage.googleapis.com:enable 200
+[debug] [2026-07-15T19:44:41.746Z] <<< [apiv2][body] POST https://serviceusage.googleapis.com/v1/projects/fakebank-a7323/services/firebasestorage.googleapis.com:enable [omitted]
+[debug] [2026-07-15T19:44:51.773Z] Checked if tokens are valid: true, expires at: 1784148279163
+[debug] [2026-07-15T19:44:51.773Z] Checked if tokens are valid: true, expires at: 1784148279163
+[debug] [2026-07-15T19:44:51.775Z] >>> [apiv2][query] GET https://firebasestorage.googleapis.com/v1alpha/projects/fakebank-a7323/defaultBucket [none]
+[debug] [2026-07-15T19:45:03.772Z] <<< [apiv2][status] GET https://firebasestorage.googleapis.com/v1alpha/projects/fakebank-a7323/defaultBucket 404
+[debug] [2026-07-15T19:45:03.772Z] <<< [apiv2][body] GET https://firebasestorage.googleapis.com/v1alpha/projects/fakebank-a7323/defaultBucket {"error":{"code":404,"message":"Requested entity was not found.","status":"NOT_FOUND"}}
+[debug] [2026-07-15T19:45:08.787Z] Error: Timed out.
+    at Timeout._onTimeout (C:\Users\DOCENTE\AppData\Roaming\npm\node_modules\firebase-tools\lib\utils.js:296:49)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[error] 
+[error] Error: An unexpected error has occurred.
