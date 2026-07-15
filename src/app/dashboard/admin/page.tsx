@@ -404,7 +404,12 @@ export default function AdminUsersPage() {
         </div>
 
         {/* KYC Document Viewer Dialog */}
-        <Dialog open={kycOpen} onOpenChange={setKycOpen}>
+        <Dialog open={kycOpen} onOpenChange={(open) => {
+          setKycOpen(open);
+          // IMPORTANT: clear heavy base64 data from memory when dialog closes
+          // to prevent UI freeze/navigation block
+          if (!open) setTimeout(() => setKycData(null), 300);
+        }}>
           <DialogContent className="glass border-white/10 sm:max-w-[700px]">
             <DialogHeader>
               <DialogTitle className="font-headline text-xl flex items-center gap-2">
