@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, Loader2, Camera, FileText, X, RefreshCw, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, Shield, Upload, User, Fingerprint, Loader2, Camera, FileText, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
@@ -17,6 +17,7 @@ import { useAuth, useFirestore, useStorage } from '@/firebase';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useI18n } from '@/lib/i18n/context';
+import { VirtualCard, CardStyleType } from '@/components/banking/virtual-card';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -45,7 +46,14 @@ export default function RegisterPage() {
     idNumber: ''
   });
   
-  const [selectedCardType, setSelectedCardType] = useState('customized-cash');
+  const cardOptions: { id: CardStyleType, name: string }[] = [
+    { id: 'customized-cash', name: 'Customized Cash Rewards (Roja)' },
+    { id: 'unlimited-cash', name: 'Unlimited Cash Rewards (Gris)' },
+    { id: 'travel-rewards', name: 'Travel Rewards (Azul oscuro)' },
+    { id: 'bankamericard', name: 'BankAmericard (Blanca)' }
+  ];
+  
+  const [selectedCardIndex, setSelectedCardIndex] = useState(0);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
     const file = e.target.files?.[0];
@@ -166,7 +174,7 @@ export default function RegisterPage() {
         expiryDate: "12/28",
         cvv: randomCvv,
         isFrozen: false,
-        type: selectedCardType,
+        type: cardOptions[selectedCardIndex].id,
         variant: 'standard',
         createdAt: new Date().toISOString()
       });
@@ -382,21 +390,46 @@ export default function RegisterPage() {
               <CardDescription>{t.auth.reg_finish_desc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-               <div className="space-y-2">
-                 <Label>Elige tu primera Tarjeta Virtual</Label>
-                 <select 
-                   className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                   value={selectedCardType}
-                   onChange={(e) => setSelectedCardType(e.target.value)}
-                 >
-                    <option value="customized-cash" className="bg-slate-900 text-white">Customized Cash Rewards (Roja)</option>
-                    <option value="unlimited-cash" className="bg-slate-900 text-white">Unlimited Cash Rewards (Gris)</option>
-                    <option value="travel-rewards" className="bg-slate-900 text-white">Travel Rewards (Azul oscuro)</option>
-                    <option value="bankamericard" className="bg-slate-900 text-white">BankAmericard (Blanca)</option>
-                 </select>
+               <div className="space-y-4">
+                 <Label className="text-center block text-lg mb-2">Elige tu primera Tarjeta Virtual</Label>
+                 
+                 <div className="flex items-center justify-between">
+                   <Button 
+                     variant="ghost" 
+                     size="icon" 
+                     className="h-10 w-10 shrink-0"
+                     onClick={() => setSelectedCardIndex(prev => prev === 0 ? cardOptions.length - 1 : prev - 1)}
+                   >
+                     <ChevronLeft />
+                   </Button>
+                   
+                   <div className="flex-1 flex flex-col items-center justify-center px-2 relative perspective-1000">
+                     <VirtualCard
+                        cardHolder={formData.fullName || "VALUED CUSTOMER"}
+                        cardNumber="4255 •••• •••• ••••"
+                        expiryDate="12/28"
+                        cvv="•••"
+                        type={cardOptions[selectedCardIndex].id}
+                        interactive={false}
+                        className="transform scale-90 sm:scale-100 transition-all duration-300 pointer-events-none mb-4"
+                     />
+                     <div className="text-sm font-semibold text-center text-primary mt-2">
+                       {cardOptions[selectedCardIndex].name}
+                     </div>
+                   </div>
+
+                   <Button 
+                     variant="ghost" 
+                     size="icon" 
+                     className="h-10 w-10 shrink-0"
+                     onClick={() => setSelectedCardIndex(prev => prev === cardOptions.length - 1 ? 0 : prev + 1)}
+                   >
+                     <ChevronRight />
+                   </Button>
+                 </div>
                </div>
                
-               <div className="text-sm text-center text-muted-foreground bg-white/5 p-4 rounded-xl border border-white/5">
+               <div className="text-sm text-center text-muted-foreground bg-white/5 p-4 rounded-xl border border-white/5 mt-4">
                  {t.auth.reg_finish_info}
                </div>
             </CardContent>
