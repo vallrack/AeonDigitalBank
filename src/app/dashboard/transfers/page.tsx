@@ -14,6 +14,9 @@ import { doc, collection, query, where, getDocs, writeBatch, increment } from 'f
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n/context';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Fingerprint } from 'lucide-react';
+import { decryptLocalData } from '@/lib/webauthn';
 
 export default function TransfersPage() {
   const { user } = useUser();
@@ -35,6 +38,12 @@ export default function TransfersPage() {
   const [fraudResult, setFraudResult] = useState<any>(null);
   const [step, setStep] = useState(1);
   const [sourceAccount, setSourceAccount] = useState<'checking' | 'savings'>('checking');
+  
+  // Auth Verification State
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [isAuthVerifying, setIsAuthVerifying] = useState(false);
+  const [useOtpFallback, setUseOtpFallback] = useState(false);
 
   // Internal Transfer State
   const [internalAmount, setInternalAmount] = useState('');
@@ -109,12 +118,50 @@ export default function TransfersPage() {
   };
 
   const confirmTransfer = async () => {
-    if (!user || !userData || !recipientUser) return;
-    setIsProcessing(true);
+    // En lugar de enviar directo, abrimos el modal de seguridad
+    setUseOtpFallback(false);
+    setAuthModalOpen(true);
+  };
 
-    const numAmount = parseFloat(amount);
+  const handleVerifyAndTransfer = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!user || !userData || !recipientUser) return;
+    
+    setIsAuthVerifying(true);
 
     try {
+      // 1. Verificación (Biométrica o OTP Simulada)
+      const storedBio = localStorage.getItem('AeonBank_BioAuth');
+      if (storedBio && window.PublicKeyCredential && !useOtpFallback) {
+        // Intentar huella
+        const bioData = JSON.parse(storedBio);
+        const credential = await navigator.credentials.get({
+          publicKey: {
+            challenge: new Uint8Array(32),
+            allowCredentials: [{
+              id: Uint8Array.from(atob(bioData.id), c => c.charCodeAt(0)),
+              type: 'public-key'
+            }],
+            timeout: 60000,
+            userVerification: 'required'
+          }
+        });
+        if (!credential) throw new Error("Verificación biométrica cancelada");
+      } else {
+        // Validación OTP Clásica
+        if (otpCode !== '123456') {
+          throw new Error("Código OTP incorrecto. Use 123456 para la simulación.");
+        }
+      }
+
+      setAuthModalOpen(false);
+      setIsProcessing(true);
+
+      // 2. Lógica Anti-Fraude
+      const numAmount = parseFloat(amount);
+      const isHighAmount = numAmount >= 1000;
+      const finalStatus = isHighAmount ? 'pending' : 'Completed';
+      
       const batch = writeBatch(db);
       
       const senderRef = doc(db, 'users', user.uid);
@@ -126,15 +173,23 @@ export default function TransfersPage() {
       const senderField = sourceAccount === 'checking' ? 'checkingBalance' : 'savingsBalance';
       const destField = 'checkingBalance';
 
+      // Al emisor siempre se le resta el dinero
       batch.update(senderRef, { [senderField]: increment(-numAmount) });
-      batch.update(recipientRef, { [destField]: increment(numAmount) });
+      
+      // Al receptor solo se le suma si NO es fraude
+      if (!isHighAmount) {
+        batch.update(recipientRef, { [destField]: increment(numAmount) });
+      }
 
+      // Transacción Emisor
       batch.set(senderTxRef, {
         userId: user.uid,
         merchant: `Transferencia a ${recipientUser.fullName}`,
         amount: numAmount,
         category: aiCategory || "Transfer",
-        status: "Completed",
+        status: finalStatus,
+        flagged: isHighAmount,
+        flagReason: isHighAmount ? "High amount transfer" : null,
         date: new Date().toISOString(),
         type: "expense",
         reference: reference || "",
@@ -143,12 +198,14 @@ export default function TransfersPage() {
         network: "AEON_INTERNAL"
       });
 
+      // Transacción Receptor
       batch.set(recipientTxRef, {
         userId: recipientUser.uid,
         merchant: `Transferencia de ${userData.fullName}`,
         amount: numAmount,
         category: "Income",
-        status: "Completed",
+        status: finalStatus,
+        flagged: isHighAmount,
         date: new Date().toISOString(),
         type: "income",
         reference: reference || "",
@@ -159,15 +216,25 @@ export default function TransfersPage() {
 
       await batch.commit();
 
+      if (isHighAmount) {
+        toast({ 
+          variant: "destructive",
+          title: "Transacción Retenida",
+          description: "La transferencia supera el límite automático de $1,000. Ha sido enviada a revisión de seguridad."
+        });
+      } else {
+        toast({ title: t.transfers.success_title });
+      }
+
       setStep(4);
-      toast({ title: t.transfers.success_title });
     } catch (error: any) {
       toast({ 
         variant: "destructive", 
-        title: t.common.error, 
-        description: error.message || t.transfers.err_general
+        title: "Fallo de Seguridad", 
+        description: error.message || "No se pudo verificar la identidad."
       });
     } finally {
+      setIsAuthVerifying(false);
       setIsProcessing(false);
     }
   };
@@ -486,6 +553,67 @@ export default function TransfersPage() {
            </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={authModalOpen} onOpenChange={setAuthModalOpen}>
+        <DialogContent className="glass border-white/10 sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Verificación de Seguridad</DialogTitle>
+            <DialogDescription>
+              Para autorizar esta transacción, necesitamos verificar tu identidad.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {localStorage.getItem('AeonBank_BioAuth') && !useOtpFallback ? (
+            <div className="flex flex-col items-center justify-center space-y-4 py-6">
+              <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mb-2">
+                <Fingerprint size={32} />
+              </div>
+              <p className="text-center text-sm text-slate-600">
+                Tu cuenta tiene la biometría activada. Usa tu huella para aprobar esta transferencia.
+              </p>
+              <Button 
+                onClick={() => handleVerifyAndTransfer()} 
+                disabled={isAuthVerifying} 
+                className="w-full glow-indigo mt-4 gap-2"
+              >
+                {isAuthVerifying ? <Loader2 className="animate-spin" /> : <Fingerprint />}
+                Autorizar con Huella
+              </Button>
+              <button 
+                type="button" 
+                onClick={() => setUseOtpFallback(true)}
+                className="text-sm text-slate-500 hover:text-[#012169] underline mt-4"
+              >
+                Tengo problemas, usar código SMS (OTP)
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleVerifyAndTransfer} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Código OTP SMS</Label>
+                <Input 
+                  type="text" 
+                  maxLength={6}
+                  value={otpCode} 
+                  onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Ej. 123456"
+                  required
+                  className="text-center tracking-widest text-lg font-mono"
+                />
+                <p className="text-xs text-muted-foreground text-center pt-2">
+                  (Simulación: Usa el código maestro 123456)
+                </p>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setAuthModalOpen(false)}>Cancelar</Button>
+                <Button type="submit" disabled={isAuthVerifying} className="glow-indigo">
+                  {isAuthVerifying ? "Verificando..." : "Confirmar Transferencia"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

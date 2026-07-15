@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [bioAuthData, setBioAuthData] = useState<{ email: string, enc: string, id: string } | null>(null);
   const [isBioLoading, setIsBioLoading] = useState(false);
+  const [showPasswordFallback, setShowPasswordFallback] = useState(false);
   const auth = useAuth();
   const router = useRouter();
   const { t } = useI18n();
@@ -32,7 +33,9 @@ export default function LoginPage() {
     const stored = localStorage.getItem('AeonBank_BioAuth');
     if (stored) {
       try {
-        setBioAuthData(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        setBioAuthData(parsed);
+        setEmail(parsed.email); // Pre-fill email
       } catch (e) {
         localStorage.removeItem('AeonBank_BioAuth');
       }
@@ -156,7 +159,7 @@ export default function LoginPage() {
               </Alert>
             )}
             
-            {bioAuthData ? (
+            {bioAuthData && !showPasswordFallback ? (
               <div className="flex flex-col items-center justify-center space-y-6 py-6">
                 <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 mb-2">
                   <Fingerprint size={40} />
@@ -174,13 +177,23 @@ export default function LoginPage() {
                   {isBioLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <Fingerprint className="h-5 w-5" />}
                   Iniciar sesión con Huella
                 </Button>
-                <button 
-                  type="button" 
-                  onClick={handleClearBiometrics}
-                  className="text-sm text-slate-500 hover:text-slate-800 underline mt-4"
-                >
-                  Ingresar con otra cuenta
-                </button>
+                
+                <div className="flex flex-col gap-2 mt-4 items-center w-full">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPasswordFallback(true)}
+                    className="text-sm text-[#012169] hover:underline"
+                  >
+                    Usar mi contraseña
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={handleClearBiometrics}
+                    className="text-xs text-slate-400 hover:text-slate-600 underline mt-2"
+                  >
+                    Ingresar con otra cuenta (Borrar biometría)
+                  </button>
+                </div>
               </div>
             ) : (
               <>

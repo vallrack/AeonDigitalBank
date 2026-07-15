@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useUser, useFirestore, useCollection } from '@/firebase';
 import { collection, query, orderBy, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, addDoc, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Users, 
   UserPlus, 
@@ -21,7 +22,10 @@ import {
   Edit,
   Trash2,
   ArrowUpCircle,
-  RefreshCw
+  RefreshCw,
+  AlertOctagon,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -72,6 +76,9 @@ export default function AdminUsersPage() {
     role: 'user'
   });
 
+  const [flaggedTransactions, setFlaggedTransactions] = useState<any[]>([]);
+  const [loadingFlags, setLoadingFlags] = useState(false);
+
   const usersQuery = useMemo(() => {
     return query(collection(db, 'users'), orderBy('createdAt', 'desc'));
   }, [db]);
@@ -84,6 +91,69 @@ export default function AdminUsersPage() {
   );
 
   const currentUserData = users.find(u => u.id === currentUser?.uid);
+
+  useEffect(() => {
+    const fetchFlagged = async () => {
+      if (users.length === 0) return;
+      setLoadingFlags(true);
+      try {
+        let allFlagged: any[] = [];
+        for (const u of users) {
+          // Fetch pending transactions for this user
+          const q = query(collection(db, 'users', u.id, 'transactions'), where('status', '==', 'pending'));
+          const snap = await getDocs(q);
+          snap.forEach(d => {
+            allFlagged.push({ ...d.data(), id: d.id, user: u });
+          });
+        }
+        allFlagged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setFlaggedTransactions(allFlagged);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingFlags(false);
+      }
+    };
+    fetchFlagged();
+  }, [users, db]);
+
+  const handleResolveFraud = async (tx: any, action: 'approve' | 'reject') => {
+    if (!confirm(`¿Estás seguro de ${action === 'approve' ? 'APROBAR' : 'RECHAZAR'} esta transacción?`)) return;
+    
+    setIsProcessing(true);
+    try {
+      const batch = writeBatch(db);
+      const txRef = doc(db, 'users', tx.userId, 'transactions', tx.id);
+      
+      if (action === 'approve') {
+        // Just mark as completed, money was already deducted from checkingBalance as "held"
+        batch.update(txRef, { status: 'completed', flagged: false, flagReason: 'Aprobado por Admin' });
+        
+        // If it was a transfer to someone else, we need to add the money to the recipient
+        if (tx.recipientId) {
+          const recipientRef = doc(db, 'users', tx.recipientId);
+          batch.update(recipientRef, { checkingBalance: increment(tx.amount) });
+        }
+      } else {
+        // Reject: refund the money back to the user
+        const userRef = doc(db, 'users', tx.userId);
+        const refundField = tx.account === 'savings' ? 'savingsBalance' : 'checkingBalance';
+        batch.update(userRef, { [refundField]: increment(tx.amount) });
+        
+        batch.update(txRef, { status: 'failed', flagged: false, flagReason: 'Rechazado por Admin (Reembolsado)' });
+      }
+      
+      await batch.commit();
+      toast({ title: "Resolución completada exitosamente" });
+      
+      // Update local state temporarily so we don't have to wait for next useEffect cycle
+      setFlaggedTransactions(prev => prev.filter(t => t.id !== tx.id));
+    } catch (e: any) {
+      toast({ variant: "destructive", title: t.common.error, description: e.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -376,95 +446,224 @@ export default function AdminUsersPage() {
         </Card>
       </div>
 
-      <Card className="glass border-white/5 overflow-hidden">
-        <CardHeader className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder={t.common.search + "..."} 
-              className="pl-9 bg-white/5 border-none"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => window.location.reload()} className="text-muted-foreground w-full sm:w-auto">
-            <RefreshCw size={14} className="mr-2" /> {t.admin.refresh}
-          </Button>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="flex justify-center p-12"><Loader2 className="animate-spin text-primary" /></div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-white/5">
-                    <TableHead>{t.admin.col_user}</TableHead>
-                    <TableHead className="hidden md:table-cell">{t.admin.col_email}</TableHead>
-                    <TableHead className="text-right">Total Consolidado</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((u) => (
-                    <TableRow key={u.id} className="border-white/5 hover:bg-white/5">
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={`https://picsum.photos/seed/${u.id}/100/100`} />
-                            <AvatarFallback className="bg-primary/20 text-primary">
-                              {u.fullName?.substring(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-bold text-sm truncate max-w-[120px] sm:max-w-none">{u.fullName}</div>
-                            {u.role === 'admin' && <Badge variant="outline" className="ml-0 text-[8px] h-3 border-primary text-primary">Admin</Badge>}
-                            {u.role === 'coordinator' && <Badge variant="outline" className="ml-0 text-[8px] h-3 border-accent text-accent">Coord</Badge>}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground hidden md:table-cell">{u.email}</TableCell>
-                      <TableCell className="text-right font-bold text-accent">
-                        ${((Number(u.checkingBalance ?? u.balance) || 0) + (Number(u.savingsBalance) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        <div className="text-[10px] text-muted-foreground font-normal">
-                          CHQ: ${(Number(u.checkingBalance ?? u.balance) || 0).toLocaleString()} | AHO: ${(Number(u.savingsBalance) || 0).toLocaleString()}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreVertical size={14} /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="glass border-white/10">
-                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                            <DropdownMenuSeparator className="bg-white/10" />
-                            {currentUserData?.role === 'admin' && (
-                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setSelectedUser(u); setDepositOpen(true); }}>
-                                <ArrowUpCircle size={12} className="mr-2 text-emerald-400"/>{t.admin.deposit}
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setSelectedUser(u); setEditOpen(true); }}>
-                              <Edit size={12} className="mr-2"/>{t.common.edit}
-                            </DropdownMenuItem>
-                            {currentUserData?.role === 'admin' && (
-                              <>
-                                <DropdownMenuSeparator className="bg-white/10" />
-                                <DropdownMenuItem onClick={() => handleDeleteUser(u.id)} className="text-destructive">
-                                  <Trash2 size={12} className="mr-2"/>{t.common.delete}
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-8 bg-black/5">
+          <TabsTrigger value="users">Gestión de Usuarios</TabsTrigger>
+          <TabsTrigger value="fraud">
+            Centro de Resoluciones
+            {flaggedTransactions.length > 0 && (
+              <span className="ml-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">
+                {flaggedTransactions.length}
+              </span>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="users" className="space-y-8">
+          <Card className="glass border-white/10 shadow-xl overflow-hidden">
+            <CardHeader className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-border/50 pb-4">
+              <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                <div>
+                  <CardTitle className="font-headline text-lg">{t.admin.users_list}</CardTitle>
+                  <CardDescription>
+                    {t.admin.total_clients}: {users.length}
+                  </CardDescription>
+                </div>
+                <div className="relative w-full md:w-64">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={t.admin.search_placeholder}
+                    className="pl-9 bg-white/50 dark:bg-black/50 border-white/20"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="w-[250px]">{t.admin.client}</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead className="text-right">{t.admin.checking}</TableHead>
+                      <TableHead className="text-right">{t.admin.savings}</TableHead>
+                      <TableHead>{t.admin.role}</TableHead>
+                      <TableHead className="text-right">{t.admin.actions}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="h-32 text-center">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredUsers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                          {t.admin.no_users}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredUsers.map((u) => (
+                        <TableRow key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-9 w-9 border border-primary/10">
+                                <AvatarFallback className="bg-primary/5 text-primary">
+                                  {u.fullName?.substring(0, 2).toUpperCase() || 'US'}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-semibold text-slate-900 dark:text-slate-100">{u.fullName}</div>
+                                <div className="text-[10px] text-muted-foreground font-mono">{u.id}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-slate-600 dark:text-slate-300">{u.email}</TableCell>
+                          <TableCell className="text-right font-mono font-medium text-emerald-600 dark:text-emerald-400">
+                            ${(Number(u.checkingBalance ?? u.balance) || 0).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium text-blue-600 dark:text-blue-400">
+                            ${(Number(u.savingsBalance) || 0).toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={u.role === 'admin' ? "default" : "secondary"} className={u.role === 'admin' ? "bg-accent hover:bg-accent/80" : ""}>
+                              {u.role || 'user'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-900">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel>{t.admin.actions}</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => { setSelectedUser(u); setEditOpen(true); }}>
+                                  <Edit className="mr-2 h-4 w-4" /> {t.common.edit}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setSelectedUser(u); setDepositOpen(true); }}>
+                                  <ArrowUpCircle className="mr-2 h-4 w-4 text-emerald-500" /> {t.admin.deposit}
+                                </DropdownMenuItem>
+                                {u.id !== currentUser?.uid && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => handleDeleteUser(u.id)} className="text-red-600 focus:text-red-600">
+                                      <Trash2 className="mr-2 h-4 w-4" /> {t.common.delete}
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="fraud" className="space-y-8">
+          <Card className="glass border-red-500/10 shadow-xl overflow-hidden">
+            <CardHeader className="bg-red-50/50 dark:bg-red-900/10 border-b border-red-100 dark:border-red-900/50 pb-4">
+              <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                <div>
+                  <CardTitle className="font-headline text-lg flex items-center gap-2 text-red-700 dark:text-red-400">
+                    <AlertOctagon size={20} />
+                    Alertas de Fraude
+                  </CardTitle>
+                  <CardDescription>
+                    Transacciones retenidas por el motor de prevención de fraudes.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Motivo / Tipo</TableHead>
+                      <TableHead className="text-right">Monto Retenido</TableHead>
+                      <TableHead className="text-right">Resolución</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loadingFlags ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-32 text-center">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+                        </TableCell>
+                      </TableRow>
+                    ) : flaggedTransactions.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                          No hay transacciones retenidas en este momento.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      flaggedTransactions.map((tx) => (
+                        <TableRow key={tx.id}>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(tx.date).toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium text-sm">{tx.user?.fullName}</div>
+                            <div className="text-xs text-muted-foreground">{tx.user?.email}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="destructive" className="bg-red-500">
+                                {tx.flagReason || 'Fraude Sospechoso'}
+                              </Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">{tx.merchant}</div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium text-red-600">
+                            ${tx.amount.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-green-600 border-green-200 hover:bg-green-50"
+                                onClick={() => handleResolveFraud(tx, 'approve')}
+                                disabled={isProcessing}
+                              >
+                                <CheckCircle2 size={16} className="mr-1" /> Aprobar
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-red-600 border-red-200 hover:bg-red-50"
+                                onClick={() => handleResolveFraud(tx, 'reject')}
+                                disabled={isProcessing}
+                              >
+                                <XCircle size={16} className="mr-1" /> Rechazar
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
       
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="glass border-white/10 sm:max-w-[425px]">

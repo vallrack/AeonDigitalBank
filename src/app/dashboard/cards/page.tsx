@@ -68,7 +68,13 @@ export default function CardsPage() {
 
     setIsPurchasing(true);
     try {
-      // 1. Descontar saldo
+      // Motor Anti-Fraude
+      const suspiciousKeywords = ['casino', 'crypto', 'binance', 'bet', 'apuesta', 'poker', 'loto'];
+      const isSuspicious = suspiciousKeywords.some(kw => purchaseMerchant.toLowerCase().includes(kw));
+      const isHighAmount = amountNum >= 1000;
+      const isFlagged = isSuspicious || isHighAmount;
+
+      // 1. Descontar saldo (el dinero queda retenido aunque sea fraude)
       await updateDoc(doc(db, 'users', user.uid), {
         checkingBalance: currentChecking - amountNum
       });
@@ -80,16 +86,27 @@ export default function CardsPage() {
         description: `Compra en ${purchaseMerchant}`,
         date: serverTimestamp(),
         createdAt: serverTimestamp(),
-        status: 'completed',
+        status: isFlagged ? 'pending' : 'completed',
+        flagged: isFlagged,
+        flagReason: isHighAmount ? 'High amount' : (isSuspicious ? 'Suspicious merchant' : null),
         account: 'checking',
         cardNumber: selectedCard.cardNumber.slice(-4),
         network: selectedCard.type === 'aeropay' ? 'AEROPAY' : 'VISA'
       });
 
-      toast({
-        title: "¡Compra Aprobada!",
-        description: `Se pagaron $${amountNum.toFixed(2)} en ${purchaseMerchant}.`
-      });
+      if (isFlagged) {
+        toast({
+          variant: "destructive",
+          title: "Alerta de Seguridad",
+          description: `La compra por $${amountNum.toFixed(2)} ha sido retenida por prevención de fraude y está bajo revisión.`
+        });
+      } else {
+        toast({
+          title: "¡Compra Aprobada!",
+          description: `Se pagaron $${amountNum.toFixed(2)} en ${purchaseMerchant}.`
+        });
+      }
+      
       setPurchaseMerchant('');
       setPurchaseAmount('');
     } catch (error: any) {
