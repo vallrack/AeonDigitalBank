@@ -240,6 +240,9 @@ export default function TransfersPage() {
         title: "Fallo de Seguridad", 
         description: error.message || "No se pudo verificar la identidad."
       });
+      if (hasBiometrics && !useOtpFallback) {
+        setUseOtpFallback(true);
+      }
     } finally {
       setIsAuthVerifying(false);
       setIsProcessing(false);

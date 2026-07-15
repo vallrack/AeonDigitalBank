@@ -73,8 +73,9 @@ export default function LoginPage() {
       }
     } catch (error: any) {
       console.error(error);
-      setErrorMessage("La verificación biométrica falló o fue cancelada.");
-      toast({ variant: "destructive", title: "Error", description: "Verificación biométrica fallida." });
+      setErrorMessage("La verificación biométrica falló o fue cancelada. Por favor, ingresa tu contraseña.");
+      setShowPasswordFallback(true);
+      toast({ variant: "destructive", title: "Biometría cancelada", description: "Por favor, usa tu contraseña." });
     } finally {
       setIsBioLoading(false);
     }
