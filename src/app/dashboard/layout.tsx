@@ -371,6 +371,57 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
     }
   };
 
+  // PENDING STATUS CHECK
+  useEffect(() => {
+    if (userData?.status === 'pending' && userData.activationTime) {
+      const activationTime = new Date(userData.activationTime);
+      const now = new Date();
+      if (now >= activationTime && user) {
+        // Auto-activate because 6 hours have passed
+        setDoc(doc(db, "users", user.uid), { status: 'active' }, { merge: true })
+          .then(() => {
+            // Trigger welcome email
+            fetch('/api/email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to: { email: userData.email, name: userData.fullName },
+                type: 'welcome',
+                data: {
+                  name: userData.fullName,
+                  activationDate: new Date().toISOString()
+                }
+              })
+            }).catch(console.error);
+          })
+          .catch(console.error);
+      }
+    }
+  }, [userData, user, db]);
+
+  if (userData?.status === 'pending') {
+    const activationTime = userData.activationTime ? new Date(userData.activationTime) : null;
+    const now = new Date();
+    
+    // Only block if we haven't reached the activation time
+    if (!activationTime || now < activationTime) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-background relative z-50 px-6 text-center">
+           <ShieldAlert size={64} className="text-amber-400 mb-6 animate-pulse" />
+           <h2 className="text-3xl font-bold font-headline mb-4">Cuenta en Verificación</h2>
+           <p className="text-muted-foreground mb-8 max-w-md">
+             Por motivos de seguridad, tu cuenta ha sido puesta en espera. 
+             El proceso de revisión y activación automática dura aproximadamente 6 horas. 
+             {activationTime && <span className="block mt-4 font-semibold text-foreground">Activación estimada: <br/>{activationTime.toLocaleString()}</span>}
+           </p>
+           <Button onClick={handleLogoutFallback} variant="outline" className="gap-2">
+             <LogOut size={16} /> Salir
+           </Button>
+        </div>
+      );
+    }
+  }
+
   if (needsBiometric) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background relative z-50">

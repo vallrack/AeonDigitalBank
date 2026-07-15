@@ -133,14 +133,31 @@ export default function RegisterPage() {
         await uploadString(faceRef, facePhoto, 'data_url');
       }
 
-      // El backend (Firebase Functions - onUserCreated) se encarga de crear el perfil en Firestore,
-      // asignar el rol correcto, el bono de bienvenida y generar la tarjeta virtual de forma segura.
-
+      // Create user profile in Firestore directly since we don't have a backend function
       const isAdmin = formData.email === 'vallrack67@gmail.com';
+      const userRole = isAdmin ? 'admin' : 'user';
+      
+      const activationTime = new Date();
+      if (!isAdmin) {
+        activationTime.setHours(activationTime.getHours() + 6); // Add 6 hours for standard users
+      }
+
+      await setDoc(doc(db, 'users', user.uid), {
+        fullName: formData.fullName,
+        email: formData.email,
+        role: userRole,
+        status: isAdmin ? 'active' : 'pending',
+        activationTime: activationTime.toISOString(),
+        createdAt: new Date().toISOString(),
+        checkingBalance: 0,
+        savingsBalance: 0
+      });
 
       toast({
-        title: isAdmin ? t.common.admin_mode : t.auth.reg_success_title,
-        description: t.auth.reg_finish_info,
+        title: isAdmin ? t.common.admin_mode : "Registro Completo",
+        description: isAdmin 
+          ? t.auth.reg_finish_info 
+          : "Tu cuenta será activada en un lapso de 6 horas por seguridad.",
       });
 
       setStep(4);

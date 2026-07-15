@@ -131,6 +131,34 @@ export async function POST(req: Request) {
         </body>
         </html>
       `;
+    } else if (type === 'welcome') {
+      subject = `¡Bienvenido a Bank of Americans! Tu cuenta está activa`;
+      htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head><style>${baseStyles}</style></head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Bank of Americans</h1>
+            </div>
+            <div class="content">
+              <p>Hola ${to.name},</p>
+              <p>¡Tenemos excelentes noticias! Tu cuenta ha superado nuestro proceso de verificación de seguridad y ha sido <strong>activada exitosamente</strong>.</p>
+              <div class="amount green">Cuenta Activa</div>
+              <div class="details">
+                <div class="detail-row"><span class="detail-label">Fecha de activación:</span> <span class="detail-value">${data.activationDate ? new Date(data.activationDate).toLocaleString() : new Date().toLocaleString()}</span></div>
+                <div class="detail-row"><span class="detail-label">Estado:</span> <span class="detail-value">Aprobada</span></div>
+              </div>
+              <p>Ya puedes iniciar sesión, solicitar tarjetas virtuales y comenzar a realizar transferencias seguras en nuestra plataforma.</p>
+            </div>
+            <div class="footer">
+              El equipo de Bank of Americans te da la bienvenida.
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
     }
 
     const brevoPayload = {

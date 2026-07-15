@@ -25,7 +25,8 @@ import {
   RefreshCw,
   AlertOctagon,
   CheckCircle2,
-  XCircle
+  XCircle,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -231,6 +232,31 @@ export default function AdminUsersPage() {
       });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleActivateAccount = async (u: any) => {
+    try {
+      await updateDoc(doc(db, 'users', u.id), {
+        status: 'active'
+      });
+      toast({ title: "Cuenta activada manualmente" });
+      
+      // Trigger welcome email
+      fetch('/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: { email: u.email, name: u.fullName },
+          type: 'welcome',
+          data: {
+            name: u.fullName,
+            activationDate: new Date().toISOString()
+          }
+        })
+      }).catch(console.error);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: t.common.error, description: e.message });
     }
   };
 
@@ -530,9 +556,16 @@ export default function AdminUsersPage() {
                             ${(Number(u.savingsBalance) || 0).toFixed(2)}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={u.role === 'admin' ? "default" : "secondary"} className={u.role === 'admin' ? "bg-accent hover:bg-accent/80" : ""}>
-                              {u.role || 'user'}
-                            </Badge>
+                            <div className="flex flex-col gap-1 items-start">
+                              <Badge variant={u.role === 'admin' ? "default" : "secondary"} className={u.role === 'admin' ? "bg-accent hover:bg-accent/80" : ""}>
+                                {u.role || 'user'}
+                              </Badge>
+                              {u.status === 'pending' && (
+                                <Badge variant="outline" className="text-amber-500 border-amber-500/30 bg-amber-500/10 text-[10px]">
+                                  Pendiente
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
@@ -544,6 +577,11 @@ export default function AdminUsersPage() {
                               <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuLabel>{t.admin.actions}</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
+                                {u.status === 'pending' && (
+                                  <DropdownMenuItem onClick={() => handleActivateAccount(u)} className="text-amber-600 focus:text-amber-600 focus:bg-amber-50">
+                                    <ShieldAlert className="mr-2 h-4 w-4" /> Activar Ahora
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => { setSelectedUser(u); setEditOpen(true); }}>
                                   <Edit className="mr-2 h-4 w-4" /> {t.common.edit}
                                 </DropdownMenuItem>
