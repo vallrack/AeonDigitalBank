@@ -464,9 +464,9 @@ export default function AdminUsersPage() {
             <CardHeader className="bg-slate-50 border-b border-border/50 pb-4">
               <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                 <div>
-                  <CardTitle className="font-headline text-lg">{t.admin.users_list}</CardTitle>
+                  <CardTitle className="font-headline text-lg">{t.admin?.users_list || "Lista de Usuarios"}</CardTitle>
                   <CardDescription>
-                    {t.admin.total_clients}: {users.length}
+                    {t.admin?.total_clients || "Total Clientes"}: {users.length}
                   </CardDescription>
                 </div>
                 <div className="relative w-full md:w-64">
