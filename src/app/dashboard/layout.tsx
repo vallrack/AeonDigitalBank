@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import { 
   LayoutDashboard, 
   ArrowRightLeft, 
@@ -17,7 +17,8 @@ import {
   Users,
   ShieldAlert,
   Languages,
-  PanelLeft
+  PanelLeft,
+  Fingerprint
 } from 'lucide-react';
 import { 
   SidebarProvider, 
@@ -43,6 +44,7 @@ import { useI18n } from '@/lib/i18n/context';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth, useUser, useDoc, useFirestore } from '@/firebase';
+import { verifyBiometrics } from '@/lib/webauthn';
 import { signOut } from 'firebase/auth';
 import { doc, getDocs, collection, query, limit, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -309,6 +311,51 @@ export default function RootDashboardLayout({ children }: { children: React.Reac
       initializeProfile();
     }
   }, [user, userData, userLoading, docLoading, db]);
+
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [needsBiometric, setNeedsBiometric] = useState(false);
+
+  useEffect(() => {
+    if (userData && userData.biometricsEnabled && !isUnlocked) {
+      setNeedsBiometric(true);
+    } else if (userData && !userData.biometricsEnabled) {
+      setNeedsBiometric(false);
+      setIsUnlocked(true);
+    }
+  }, [userData, isUnlocked]);
+
+  const handleBiometricUnlock = async () => {
+    if (!userData?.biometricCredentialId) return;
+    setIsUnlocking(true);
+    try {
+      const success = await verifyBiometrics(userData.biometricCredentialId);
+      if (success) {
+        setIsUnlocked(true);
+        setNeedsBiometric(false);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  if (needsBiometric) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background relative z-50">
+         <Fingerprint size={64} className="text-primary mb-6 animate-pulse" />
+         <h2 className="text-2xl font-bold font-headline mb-2">App Bloqueada</h2>
+         <p className="text-muted-foreground mb-8 text-center max-w-sm">
+           Tu banco está protegido por biometría. Usa tu huella o rostro para acceder.
+         </p>
+         <Button onClick={handleBiometricUnlock} disabled={isUnlocking} className="glow-indigo gap-2" size="lg">
+           <Fingerprint size={18} />
+           {isUnlocking ? "Verificando..." : "Desbloquear con Biometría"}
+         </Button>
+      </div>
+    );
+  }
 
   return (
     <IncognitoProvider>

@@ -10,16 +10,20 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Shield, Fingerprint, Smartphone, History, Lock, Key, CheckCircle2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { updatePassword } from 'firebase/auth';
+import { doc, updateDoc } from 'firebase/firestore';
 import { useI18n } from '@/lib/i18n/context';
+import { registerBiometrics } from '@/lib/webauthn';
 
 export default function SecurityPage() {
   const { user } = useUser();
   const auth = useAuth();
   const { t } = useI18n();
+  const db = useFirestore();
   const [newPassword, setNewPassword] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isBioLoading, setIsBioLoading] = useState(false);
 
   const handleUpdatePassword = async () => {
     if (!newPassword || newPassword.length < 6) {
@@ -46,6 +50,38 @@ export default function SecurityPage() {
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleToggleBiometrics = async (checked: boolean) => {
+    if (!user) return;
+    setIsBioLoading(true);
+
+    try {
+      if (checked) {
+        // Turn ON biometrics
+        const credentialId = await registerBiometrics(user.uid, user.email || 'user');
+        await updateDoc(doc(db, 'users', user.uid), {
+          biometricsEnabled: true,
+          biometricCredentialId: credentialId
+        });
+        toast({ title: "Biometría Activada", description: "Tu dispositivo ha sido enlazado exitosamente." });
+      } else {
+        // Turn OFF biometrics
+        await updateDoc(doc(db, 'users', user.uid), {
+          biometricsEnabled: false,
+          biometricCredentialId: null
+        });
+        toast({ title: "Biometría Desactivada" });
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: t.common.error,
+        description: error.message || "Fallo en registro biométrico."
+      });
+    } finally {
+      setIsBioLoading(false);
     }
   };
 
@@ -133,7 +169,11 @@ export default function SecurityPage() {
                   <Label className="text-base">{t.security.enable_biometrics}</Label>
                   <p className="text-xs text-muted-foreground">{t.security.enable_biometrics_desc}</p>
                 </div>
-                <Switch />
+                <Switch 
+                  checked={!!user?.biometricsEnabled}
+                  onCheckedChange={handleToggleBiometrics}
+                  disabled={isBioLoading}
+                />
               </div>
             </CardContent>
           </Card>
