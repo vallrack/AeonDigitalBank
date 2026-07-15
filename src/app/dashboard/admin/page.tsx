@@ -461,7 +461,7 @@ export default function AdminUsersPage() {
 
         <TabsContent value="users" className="space-y-8">
           <Card className="glass border-white/10 shadow-xl overflow-hidden">
-            <CardHeader className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-border/50 pb-4">
+            <CardHeader className="bg-slate-50 border-b border-border/50 pb-4">
               <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                 <div>
                   <CardTitle className="font-headline text-lg">{t.admin.users_list}</CardTitle>
@@ -473,7 +473,7 @@ export default function AdminUsersPage() {
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder={t.admin.search_placeholder}
-                    className="pl-9 bg-white/50 dark:bg-black/50 border-white/20"
+                    className="pl-9 bg-white border-slate-200"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -508,7 +508,7 @@ export default function AdminUsersPage() {
                       </TableRow>
                     ) : (
                       filteredUsers.map((u) => (
-                        <TableRow key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                        <TableRow key={u.id} className="hover:bg-slate-50 transition-colors">
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-3">
                               <Avatar className="h-9 w-9 border border-primary/10">
@@ -517,16 +517,16 @@ export default function AdminUsersPage() {
                                 </AvatarFallback>
                               </Avatar>
                               <div>
-                                <div className="font-semibold text-slate-900 dark:text-slate-100">{u.fullName}</div>
-                                <div className="text-[10px] text-muted-foreground font-mono">{u.id}</div>
+                                <div className="font-semibold text-slate-900">{u.fullName}</div>
+                                <div className="text-[10px] text-slate-500 font-mono">{u.id}</div>
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-slate-600 dark:text-slate-300">{u.email}</TableCell>
-                          <TableCell className="text-right font-mono font-medium text-emerald-600 dark:text-emerald-400">
+                          <TableCell className="text-slate-600">{u.email}</TableCell>
+                          <TableCell className="text-right font-mono font-medium text-emerald-600">
                             ${(Number(u.checkingBalance ?? u.balance) || 0).toFixed(2)}
                           </TableCell>
-                          <TableCell className="text-right font-mono font-medium text-blue-600 dark:text-blue-400">
+                          <TableCell className="text-right font-mono font-medium text-blue-600">
                             ${(Number(u.savingsBalance) || 0).toFixed(2)}
                           </TableCell>
                           <TableCell>
@@ -572,11 +572,11 @@ export default function AdminUsersPage() {
         </TabsContent>
 
         <TabsContent value="fraud" className="space-y-8">
-          <Card className="glass border-red-500/10 shadow-xl overflow-hidden">
-            <CardHeader className="bg-red-50/50 dark:bg-red-900/10 border-b border-red-100 dark:border-red-900/50 pb-4">
+          <Card className="glass shadow-xl overflow-hidden">
+            <CardHeader className="bg-red-50 border-b border-red-100 pb-4">
               <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                 <div>
-                  <CardTitle className="font-headline text-lg flex items-center gap-2 text-red-700 dark:text-red-400">
+                  <CardTitle className="font-headline text-lg flex items-center gap-2 text-red-700">
                     <AlertOctagon size={20} />
                     Alertas de Fraude
                   </CardTitle>
