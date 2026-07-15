@@ -223,14 +223,57 @@ export default function TransfersPage() {
 
       await batch.commit();
 
+      // Send emails
+      const transferDate = new Date().toISOString();
+      const transferData = {
+        amount: numAmount,
+        senderName: userData.fullName,
+        receiverName: recipientUser.fullName,
+        date: transferDate,
+        reference: reference || 'N/A'
+      };
+
       if (isHighAmount) {
         toast({ 
           variant: "destructive",
           title: "Transacción Retenida",
           description: "La transferencia supera el límite automático de $1,000. Ha sido enviada a revisión de seguridad."
         });
+        
+        // Notify sender that it is held
+        fetch('/api/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: { email: userData.email, name: userData.fullName },
+            type: 'held',
+            data: transferData
+          })
+        }).catch(err => console.error("Error sending held email:", err));
       } else {
         toast({ title: t.transfers.success_title });
+        
+        // Notify sender (Receipt)
+        fetch('/api/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: { email: userData.email, name: userData.fullName },
+            type: 'receipt',
+            data: transferData
+          })
+        }).catch(err => console.error("Error sending receipt email:", err));
+
+        // Notify recipient (Received)
+        fetch('/api/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: { email: recipientUser.email, name: recipientUser.fullName },
+            type: 'received',
+            data: transferData
+          })
+        }).catch(err => console.error("Error sending received email:", err));
       }
 
       setStep(4);
