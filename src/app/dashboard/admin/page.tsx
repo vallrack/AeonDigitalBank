@@ -67,7 +67,7 @@ export default function AdminUsersPage() {
     fullName: '',
     email: '',
     password: '',
-    checkingBalance: 5000,
+    checkingBalance: 0,
     savingsBalance: 0,
     role: 'user'
   });
@@ -90,7 +90,12 @@ export default function AdminUsersPage() {
     setIsProcessing(true);
 
     try {
-      const secondaryApp = initializeApp(getApp().options, 'Secondary');
+      let secondaryApp;
+      try {
+        secondaryApp = getApp('Secondary');
+      } catch (e) {
+        secondaryApp = initializeApp(getApp().options, 'Secondary');
+      }
       const secondaryAuth = getAuth(secondaryApp);
       
       const userCredential = await createUserWithEmailAndPassword(
@@ -147,7 +152,7 @@ export default function AdminUsersPage() {
 
       toast({ title: t.common.success });
       setRegisterOpen(false);
-      setNewUserData({ fullName: '', email: '', password: '', checkingBalance: 5000, savingsBalance: 0, role: 'user' });
+      setNewUserData({ fullName: '', email: '', password: '', checkingBalance: 0, savingsBalance: 0, role: 'user' });
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -243,9 +248,12 @@ export default function AdminUsersPage() {
     }
   };
 
-  const totalReserves = useMemo(() => {
+  const totalBalances = useMemo(() => {
     return users.reduce((acc, u) => acc + (Number(u.checkingBalance ?? u.balance) || 0) + (Number(u.savingsBalance) || 0), 0);
   }, [users]);
+
+  // Derived state to ensure real-time updates reflect in open modals
+  const activeUser = selectedUser ? (users.find(u => u.id === selectedUser.id) || selectedUser) : null;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -260,7 +268,7 @@ export default function AdminUsersPage() {
 
         <Dialog open={registerOpen} onOpenChange={(open) => {
           setRegisterOpen(open);
-          if (!open) setNewUserData({ fullName: '', email: '', password: '', checkingBalance: 5000, savingsBalance: 0, role: 'user' });
+          if (!open) setNewUserData({ fullName: '', email: '', password: '', checkingBalance: 0, savingsBalance: 0, role: 'user' });
         }}>
           <DialogTrigger asChild>
             <Button className="gap-2 glow-indigo w-full md:w-auto">
@@ -362,7 +370,7 @@ export default function AdminUsersPage() {
         </Card>
         <Card className="glass border-white/5 sm:col-span-2 md:col-span-1">
           <CardHeader>
-            <CardTitle>${totalReserves.toLocaleString()}</CardTitle>
+            <CardTitle>${totalBalances.toLocaleString()}</CardTitle>
             <CardDescription>{t.admin.total_reserves}</CardDescription>
           </CardHeader>
         </Card>
@@ -431,11 +439,11 @@ export default function AdminUsersPage() {
                             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-white/10" />
                             {currentUserData?.role === 'admin' && (
-                              <DropdownMenuItem onClick={() => { setSelectedUser(u); setDepositOpen(true); }}>
+                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setSelectedUser(u); setDepositOpen(true); }}>
                                 <ArrowUpCircle size={12} className="mr-2 text-emerald-400"/>{t.admin.deposit}
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={() => { setSelectedUser(u); setEditOpen(true); }}>
+                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setSelectedUser(u); setEditOpen(true); }}>
                               <Edit size={12} className="mr-2"/>{t.common.edit}
                             </DropdownMenuItem>
                             {currentUserData?.role === 'admin' && (
@@ -458,30 +466,29 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
       
-      {/* Edit User Dialog */}
-      <Dialog open={editOpen} onOpenChange={(open) => {
-        setEditOpen(open);
-        if (!open) setSelectedUser(null);
-      }}>
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="glass border-white/10 sm:max-w-[425px]">
-          <DialogHeader><DialogTitle>{t.admin.edit_profile}</DialogTitle></DialogHeader>
-          {selectedUser && (
-            <form onSubmit={handleUpdateUser} className="space-y-4">
+          <DialogHeader>
+            <DialogTitle>Editar Saldos</DialogTitle>
+            <DialogDescription>Ajusta el balance de {activeUser?.fullName}</DialogDescription>
+          </DialogHeader>
+          {activeUser && (
+            <form onSubmit={handleUpdateBalance} className="space-y-4">
               <div className="space-y-2">
                 <Label>{t.admin.name}</Label>
-                <Input value={selectedUser.fullName} onChange={e => setSelectedUser({...selectedUser, fullName: e.target.value})} />
+                <Input value={activeUser.fullName} onChange={e => setSelectedUser({...activeUser, fullName: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>Saldo Cheques</Label>
-                <Input type="number" value={selectedUser.checkingBalance ?? selectedUser.balance ?? 0} onChange={e => setSelectedUser({...selectedUser, checkingBalance: e.target.value})} />
+                <Input type="number" value={activeUser.checkingBalance ?? activeUser.balance ?? 0} onChange={e => setSelectedUser({...activeUser, checkingBalance: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>Saldo Ahorros</Label>
-                <Input type="number" value={selectedUser.savingsBalance ?? 0} onChange={e => setSelectedUser({...selectedUser, savingsBalance: e.target.value})} />
+                <Input type="number" value={activeUser.savingsBalance ?? 0} onChange={e => setSelectedUser({...activeUser, savingsBalance: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>{t.admin.role || "Rol"}</Label>
-                <Select value={selectedUser.role} onValueChange={(value) => setSelectedUser({...selectedUser, role: value})}>
+                <Select value={activeUser.role} onValueChange={(value) => setSelectedUser({...activeUser, role: value})}>
                   <SelectTrigger className="bg-background/50">
                     <SelectValue />
                   </SelectTrigger>
@@ -502,21 +509,20 @@ export default function AdminUsersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Deposit Dialog */}
-      <Dialog open={depositOpen} onOpenChange={(open) => {
-        setDepositOpen(open);
-        if (!open) {
-          setSelectedUser(null);
-          setDepositAmount('');
-        }
-      }}>
+      <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
         <DialogContent className="glass border-white/10 sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>{t.admin.deposit}</DialogTitle>
-            <DialogDescription>{t.admin.add_balance} {selectedUser?.fullName}.</DialogDescription>
+            <DialogDescription>Añadir saldo a {activeUser?.fullName}.</DialogDescription>
           </DialogHeader>
-          {selectedUser && (
+          {activeUser && (
             <form onSubmit={handleDeposit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>{t.admin.current_balance}</Label>
+                <div className="text-2xl font-bold text-emerald-400">
+                  ${((Number(activeUser.checkingBalance ?? activeUser.balance) || 0) + (Number(activeUser.savingsBalance) || 0)).toLocaleString()}
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label>Cuenta de Destino</Label>
                 <Select value={depositAccount} onValueChange={(val: 'checking' | 'savings') => setDepositAccount(val)}>
