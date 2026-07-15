@@ -18,6 +18,8 @@ interface VirtualCardProps {
   className?: string;
   interactive?: boolean;
   customColor?: string;
+  customBgImage?: string;
+  customLogo?: string;
 }
 
 export function VirtualCard({ 
@@ -31,7 +33,9 @@ export function VirtualCard({
   showNumbersOnFront = true,
   className,
   interactive = true,
-  customColor
+  customColor,
+  customBgImage,
+  customLogo
 }: VirtualCardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [timer, setTimer] = useState(300);
@@ -96,8 +100,12 @@ export function VirtualCard({
     logoType = "VISA Signature";
   }
 
-  const cardStyle = type === 'custom' && customColor 
-    ? { background: `linear-gradient(135deg, ${customColor} 0%, #1a1a1a 100%)` } 
+  const cardStyle = type === 'custom' 
+    ? { 
+        background: customBgImage 
+          ? `url(${customBgImage}) center/cover no-repeat` 
+          : `linear-gradient(135deg, ${customColor || '#1a1a1a'} 0%, #000000 100%)`
+      } 
     : {};
 
   const formattedCardNumber = cardNumber.padEnd(16, '•').match(/.{1,4}/g)?.join(' ') || cardNumber;
