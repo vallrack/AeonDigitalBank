@@ -44,6 +44,8 @@ export default function RegisterPage() {
     idType: 'Passport',
     idNumber: ''
   });
+  
+  const [selectedCardType, setSelectedCardType] = useState('customized-cash');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
     const file = e.target.files?.[0];
@@ -151,6 +153,22 @@ export default function RegisterPage() {
         createdAt: new Date().toISOString(),
         checkingBalance: 0,
         savingsBalance: 0
+      });
+
+      // Generate the initial Virtual Card requested by the user
+      const randomCard = "4255" + Math.floor(100000000000 + Math.random() * 900000000000).toString().substring(0, 12);
+      const randomCvv = Math.floor(100 + Math.random() * 900).toString().substring(0, 3);
+      
+      await addDoc(collection(db, 'users', user.uid, 'virtualCards'), {
+        userId: user.uid,
+        cardHolder: (formData.fullName || "VALUED CUSTOMER").toUpperCase(),
+        cardNumber: randomCard,
+        expiryDate: "12/28",
+        cvv: randomCvv,
+        isFrozen: false,
+        type: selectedCardType,
+        variant: 'standard',
+        createdAt: new Date().toISOString()
       });
 
       toast({
@@ -363,7 +381,21 @@ export default function RegisterPage() {
               <CardTitle className="text-2xl font-headline font-bold">{t.auth.reg_finish_title}</CardTitle>
               <CardDescription>{t.auth.reg_finish_desc}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+               <div className="space-y-2">
+                 <Label>Elige tu primera Tarjeta Virtual</Label>
+                 <select 
+                   className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                   value={selectedCardType}
+                   onChange={(e) => setSelectedCardType(e.target.value)}
+                 >
+                    <option value="customized-cash" className="bg-slate-900 text-white">Customized Cash Rewards (Roja)</option>
+                    <option value="unlimited-cash" className="bg-slate-900 text-white">Unlimited Cash Rewards (Gris)</option>
+                    <option value="travel-rewards" className="bg-slate-900 text-white">Travel Rewards (Azul oscuro)</option>
+                    <option value="bankamericard" className="bg-slate-900 text-white">BankAmericard (Blanca)</option>
+                 </select>
+               </div>
+               
                <div className="text-sm text-center text-muted-foreground bg-white/5 p-4 rounded-xl border border-white/5">
                  {t.auth.reg_finish_info}
                </div>
