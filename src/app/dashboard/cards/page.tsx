@@ -28,6 +28,9 @@ export default function CardsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<CardStyleType>('customized-cash');
   const [selectedVariant, setSelectedVariant] = useState<'standard'|'fifa'>('standard');
+  const [customColor, setCustomColor] = useState('#1d4ed8');
+  const [customBgImage, setCustomBgImage] = useState('');
+  const [customLogo, setCustomLogo] = useState('');
 
   const cardsQuery = useMemo(() => {
     if (!user) return null;
@@ -134,6 +137,9 @@ export default function CardsPage() {
         isFrozen: false,
         type: selectedType,
         variant: (selectedType === 'customized-cash' || selectedType === 'unlimited-cash') ? selectedVariant : 'standard',
+        customColor: selectedType === 'custom' ? customColor : null,
+        customBgImage: selectedType === 'custom' ? customBgImage : null,
+        customLogo: selectedType === 'custom' ? customLogo : null,
         createdAt: new Date().toISOString()
       });
 
@@ -234,9 +240,58 @@ export default function CardsPage() {
                     <SelectItem value="unlimited-cash">Unlimited Cash Rewards (Gris/Plata)</SelectItem>
                     <SelectItem value="travel-rewards">Travel Rewards (Azul oscuro)</SelectItem>
                     <SelectItem value="bankamericard">BankAmericard (Blanca)</SelectItem>
+                    <SelectItem value="custom">Diseño Personalizado (Custom)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {selectedType === 'custom' && (
+                <div className="space-y-4 mt-4 animate-in fade-in zoom-in duration-300">
+                  <div className="space-y-2">
+                    <Label>Color de Fondo (Hexadecimal o nombre)</Label>
+                    <Input 
+                      value={customColor} 
+                      onChange={(e) => setCustomColor(e.target.value)} 
+                      type="color"
+                      className="h-10 w-full cursor-pointer bg-background/50 border-white/10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>URL de Imagen de Fondo (Opcional)</Label>
+                    <Input 
+                      placeholder="https://ejemplo.com/fondo.jpg" 
+                      value={customBgImage} 
+                      onChange={(e) => setCustomBgImage(e.target.value)} 
+                      className="bg-background/50 border-white/10"
+                    />
+                    <p className="text-xs text-muted-foreground">Si pones una imagen, el color de fondo será ignorado.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>URL de Logo Central (Opcional)</Label>
+                    <Input 
+                      placeholder="https://ejemplo.com/logo.png" 
+                      value={customLogo} 
+                      onChange={(e) => setCustomLogo(e.target.value)} 
+                      className="bg-background/50 border-white/10"
+                    />
+                    <p className="text-xs text-muted-foreground">Este logo aparecerá brillante en el centro de la tarjeta.</p>
+                  </div>
+
+                  <div className="mt-6 flex justify-center pointer-events-none">
+                    <VirtualCard 
+                      cardHolder={(user?.displayName || "VALUED CUSTOMER").toUpperCase()}
+                      cardNumber="•••• •••• •••• 1234"
+                      expiryDate="12/28"
+                      cvv="***"
+                      type="custom"
+                      customColor={customColor}
+                      customBgImage={customBgImage}
+                      customLogo={customLogo}
+                      interactive={false}
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Selector de variante (solo para rojo y gris) */}
               {(selectedType === 'customized-cash' || selectedType === 'unlimited-cash') ? (
@@ -322,18 +377,21 @@ export default function CardsPage() {
            <div className="space-y-8 mt-4">
               {allCards.length > 0 ? (
                 allCards.map(card => (
-                  <div key={card.id} className="flex flex-col items-center gap-4">
+                  <div key={card.id} className="flex flex-col items-center gap-4 relative group">
                     <VirtualCard 
                       cardHolder={card.cardHolder}
                       cardNumber={card.cardNumber}
                       expiryDate={card.expiryDate}
                       cvv={card.cvv}
                       isFrozen={card.isFrozen}
-                      type={card.type as CardStyleType}
-                      variant={card.variant as 'standard' | 'fifa' || 'standard'}
+                      type={card.type as any}
+                      variant={card.variant as any}
+                      customColor={card.customColor}
+                      customBgImage={card.customBgImage}
+                      customLogo={card.customLogo}
                       showNumbersOnFront={true}
                     />
-                    <div className="flex gap-2 w-full max-w-sm">
+                    <div className="flex gap-2 w-full max-w-sm mt-4">
                       <Button variant="outline" size="sm" className="flex-1 gap-2 border-white/10 hover:bg-white/5" onClick={() => toggleFreeze(card)}>
                         <Power size={14} className={card.isFrozen ? "text-emerald-400" : "text-amber-400"} /> 
                         {card.isFrozen ? t.cards.unfreeze : t.cards.freeze}

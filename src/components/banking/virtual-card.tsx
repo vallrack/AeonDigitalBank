@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Zap, Recycle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type CardStyleType = 'customized-cash' | 'unlimited-cash' | 'travel-rewards' | 'bankamericard' | 'disposable' | 'standard';
+export type CardStyleType = 'customized-cash' | 'unlimited-cash' | 'travel-rewards' | 'bankamericard' | 'disposable' | 'standard' | 'custom';
 
 interface VirtualCardProps {
   cardHolder: string;
@@ -17,6 +17,7 @@ interface VirtualCardProps {
   showNumbersOnFront?: boolean;
   className?: string;
   interactive?: boolean;
+  customColor?: string;
 }
 
 export function VirtualCard({ 
@@ -29,7 +30,8 @@ export function VirtualCard({
   variant = 'standard',
   showNumbersOnFront = true,
   className,
-  interactive = true
+  interactive = true,
+  customColor
 }: VirtualCardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [timer, setTimer] = useState(300);
@@ -88,7 +90,15 @@ export function VirtualCard({
     logoType = "mastercard";
     showRecycle = true;
     showNuevaOferta = true;
+  } else if (type === 'custom') {
+    bgClass = ""; // Usaremos style inline
+    ribbonColor = "rgba(255,255,255,0.1)";
+    logoType = "VISA Signature";
   }
+
+  const cardStyle = type === 'custom' && customColor 
+    ? { background: `linear-gradient(135deg, ${customColor} 0%, #1a1a1a 100%)` } 
+    : {};
 
   const formattedCardNumber = cardNumber.padEnd(16, '•').match(/.{1,4}/g)?.join(' ') || cardNumber;
 
@@ -103,11 +113,14 @@ export function VirtualCard({
         onClick={handleClick}
       >
         {/* Front */}
-        <div className={cn(
-          "absolute inset-0 backface-hidden rounded-xl overflow-hidden shadow-xl border border-black/10 flex flex-col",
-          bgClass,
-          isFrozen && "grayscale opacity-80"
-        )}>
+        <div 
+          className={cn(
+            "absolute inset-0 backface-hidden rounded-xl overflow-hidden shadow-xl border border-black/10 flex flex-col",
+            bgClass,
+            isFrozen && "grayscale opacity-80"
+          )}
+          style={cardStyle}
+        >
           
           {/* Background Ribbons */}
           <div className="absolute inset-0 pointer-events-none">
@@ -193,17 +206,25 @@ export function VirtualCard({
               </div>
             )}
 
-            {/* FIFA Variant Trophy Center */}
-            {variant === 'fifa' && (
+            {/* FIFA Variant Trophy Center OR Custom Logo */}
+            {(variant === 'fifa' || (type === 'custom' && customLogo)) && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                 <div className="w-[150px] h-[150px] bg-gradient-radial from-white/40 to-transparent rounded-full blur-xl absolute opacity-70 mix-blend-overlay"></div>
                 <div className="absolute w-[180px] h-[180px] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(255,255,255,0.2)_10deg,transparent_20deg,rgba(255,255,255,0.2)_30deg,transparent_40deg,rgba(255,255,255,0.2)_50deg,transparent_60deg,rgba(255,255,255,0.2)_70deg,transparent_80deg,rgba(255,255,255,0.2)_90deg,transparent_100deg,rgba(255,255,255,0.2)_110deg,transparent_120deg,rgba(255,255,255,0.2)_130deg,transparent_140deg,rgba(255,255,255,0.2)_150deg,transparent_160deg,rgba(255,255,255,0.2)_170deg,transparent_180deg,rgba(255,255,255,0.2)_190deg,transparent_200deg,rgba(255,255,255,0.2)_210deg,transparent_220deg,rgba(255,255,255,0.2)_230deg,transparent_240deg,rgba(255,255,255,0.2)_250deg,transparent_260deg,rgba(255,255,255,0.2)_270deg,transparent_280deg,rgba(255,255,255,0.2)_290deg,transparent_300deg,rgba(255,255,255,0.2)_310deg,transparent_320deg,rgba(255,255,255,0.2)_330deg,transparent_340deg,rgba(255,255,255,0.2)_350deg,transparent_360deg)] opacity-30 mix-blend-overlay animate-spin-slow"></div>
-                <img 
-                  src="https://assets.football-logos.cc/logos/tournaments/700x700/fifa-world-cup-2026--white.9ba8a004.png" 
-                  alt="FIFA World Cup 2026" 
-                  className="h-24 w-auto z-10 drop-shadow-2xl opacity-90"
-                  style={{ filter: 'drop-shadow(0px 8px 10px rgba(0,0,0,0.4)) sepia(1) saturate(5) hue-rotate(15deg) brightness(1.2)' }}
-                />
+                {variant === 'fifa' ? (
+                  <img 
+                    src="https://assets.football-logos.cc/logos/tournaments/700x700/fifa-world-cup-2026--white.9ba8a004.png" 
+                    alt="FIFA World Cup 2026" 
+                    className="h-24 w-auto z-10 drop-shadow-2xl opacity-90"
+                    style={{ filter: 'drop-shadow(0px 8px 10px rgba(0,0,0,0.4)) sepia(1) saturate(5) hue-rotate(15deg) brightness(1.2)' }}
+                  />
+                ) : (
+                  <img 
+                    src={customLogo} 
+                    alt="Custom Logo" 
+                    className="h-24 w-auto z-10 drop-shadow-2xl object-contain opacity-90"
+                  />
+                )}
               </div>
             )}
 
