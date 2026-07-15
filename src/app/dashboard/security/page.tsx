@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Shield, Fingerprint, Smartphone, History, Lock, Key, CheckCircle2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc } from '@/firebase';
 import { updatePassword } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useI18n } from '@/lib/i18n/context';
@@ -21,6 +21,7 @@ export default function SecurityPage() {
   const auth = useAuth();
   const { t } = useI18n();
   const db = useFirestore();
+  const { data: userData } = useDoc(user ? doc(db, 'users', user.uid) : null);
   const [newPassword, setNewPassword] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isBioLoading, setIsBioLoading] = useState(false);
@@ -170,7 +171,7 @@ export default function SecurityPage() {
                   <p className="text-xs text-muted-foreground">{t.security.enable_biometrics_desc}</p>
                 </div>
                 <Switch 
-                  checked={!!user?.biometricsEnabled}
+                  checked={!!userData?.biometricsEnabled}
                   onCheckedChange={handleToggleBiometrics}
                   disabled={isBioLoading}
                 />

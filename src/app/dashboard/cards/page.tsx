@@ -5,18 +5,19 @@ import React, { useState, useMemo } from 'react';
 import { VirtualCard, CardStyleType } from '@/components/banking/virtual-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Power, ShieldAlert, Sliders, Trash2, Zap, Loader2 } from 'lucide-react';
+import { Plus, Power, ShieldAlert, Sliders, Trash2, Zap, Loader2, ShoppingCart } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { useUser, useFirestore, useCollection } from '@/firebase';
-import { collection, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
+import { collection, addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { useI18n } from '@/lib/i18n/context';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 
 export default function CardsPage() {
   const { user, loading: userLoading } = useUser();
@@ -34,6 +35,69 @@ export default function CardsPage() {
   }, [db, user]);
 
   const { data: cards, loading: cardsLoading } = useCollection(cardsQuery);
+  const { data: userData } = useDoc(user ? doc(db, 'users', user.uid) : null);
+
+  const [purchaseMerchant, setPurchaseMerchant] = useState('');
+  const [purchaseAmount, setPurchaseAmount] = useState('');
+  const [purchaseCardId, setPurchaseCardId] = useState('');
+  const [isPurchasing, setIsPurchasing] = useState(false);
+
+  const handlePurchase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !userData || !purchaseMerchant || !purchaseAmount || !purchaseCardId) return;
+
+    const amountNum = parseFloat(purchaseAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast({ variant: "destructive", title: t.common.error, description: "Monto inválido" });
+      return;
+    }
+
+    const selectedCard = cards.find(c => c.id === purchaseCardId);
+    if (!selectedCard) return;
+
+    if (selectedCard.isFrozen) {
+      toast({ variant: "destructive", title: "Transacción Rechazada", description: "La tarjeta seleccionada está bloqueada/congelada." });
+      return;
+    }
+
+    const currentChecking = Number(userData.checkingBalance ?? userData.balance) || 0;
+    if (currentChecking < amountNum) {
+      toast({ variant: "destructive", title: "Transacción Rechazada", description: "Fondos insuficientes en la cuenta de Cheques." });
+      return;
+    }
+
+    setIsPurchasing(true);
+    try {
+      // 1. Descontar saldo
+      await updateDoc(doc(db, 'users', user.uid), {
+        checkingBalance: currentChecking - amountNum
+      });
+
+      // 2. Registrar Transacción
+      await addDoc(collection(db, 'users', user.uid, 'transactions'), {
+        amount: amountNum,
+        type: 'debit',
+        description: `Compra en ${purchaseMerchant}`,
+        date: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        status: 'completed',
+        account: 'checking',
+        cardNumber: selectedCard.cardNumber.slice(-4),
+        network: selectedCard.type === 'aeropay' ? 'AEROPAY' : 'VISA'
+      });
+
+      toast({
+        title: "¡Compra Aprobada!",
+        description: `Se pagaron $${amountNum.toFixed(2)} en ${purchaseMerchant}.`
+      });
+      setPurchaseMerchant('');
+      setPurchaseAmount('');
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
 
   const handleCreateCard = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -316,6 +380,64 @@ export default function CardsPage() {
               </div>
 
               <Button className="w-full glow-indigo mt-4">{t.cards.save_config}</Button>
+            </CardContent>
+          </Card>
+
+          <Card className="glass border-primary/5">
+            <CardHeader>
+              <div className="flex items-center gap-2 mb-1">
+                <ShoppingCart className="text-emerald-400" size={20} />
+                <CardTitle className="text-xl font-headline font-bold">Simulador de Compras</CardTitle>
+              </div>
+              <CardDescription>Prueba tus tarjetas realizando una compra virtual simulada.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePurchase} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Comercio / Tienda</Label>
+                  <Input 
+                    placeholder="Ej. Netflix, Amazon, Apple Store..." 
+                    value={purchaseMerchant}
+                    onChange={e => setPurchaseMerchant(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Monto a Pagar ($)</Label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    placeholder="0.00" 
+                    value={purchaseAmount}
+                    onChange={e => setPurchaseAmount(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Seleccionar Tarjeta</Label>
+                  <Select value={purchaseCardId} onValueChange={setPurchaseCardId}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Selecciona una tarjeta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cards.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.type.toUpperCase()} •••• {c.cardNumber.slice(-4)} {c.isFrozen ? '(Bloqueada)' : ''}
+                        </SelectItem>
+                      ))}
+                      {cards.length === 0 && (
+                        <SelectItem value="none" disabled>No tienes tarjetas virtuales</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button 
+                  type="submit" 
+                  disabled={isPurchasing || cards.length === 0 || !purchaseCardId}
+                  className="w-full glow-indigo bg-emerald-500 hover:bg-emerald-600 text-white border-none mt-2"
+                >
+                  {isPurchasing ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
+                  Procesar Pago
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </div>
