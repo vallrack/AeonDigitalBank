@@ -91,8 +91,8 @@ export default function AdminUsersPage() {
   const { data: users, loading } = useCollection(usersQuery);
 
   const filteredUsers = users.filter(u => 
-    u.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    (u.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const currentUserData = users.find(u => u.id === currentUser?.uid);
