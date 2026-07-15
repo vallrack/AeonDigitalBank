@@ -819,25 +819,25 @@ export default function AdminUsersPage() {
         <DialogContent className="glass border-white/10 sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Editar Saldos</DialogTitle>
-            <DialogDescription>Ajusta el balance de {activeUser?.fullName}</DialogDescription>
+            <DialogDescription>Ajusta el balance de {selectedUser?.fullName}</DialogDescription>
           </DialogHeader>
-          {activeUser && (
-            <form onSubmit={handleUpdateBalance} className="space-y-4">
+          {selectedUser && (
+            <form onSubmit={handleUpdateUser} className="space-y-4">
               <div className="space-y-2">
                 <Label>{t.admin.name}</Label>
-                <Input value={activeUser.fullName} onChange={e => setSelectedUser({...activeUser, fullName: e.target.value})} />
+                <Input value={selectedUser.fullName || ''} onChange={e => setSelectedUser({...selectedUser, fullName: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>Saldo Cheques</Label>
-                <Input type="number" value={activeUser.checkingBalance ?? activeUser.balance ?? 0} onChange={e => setSelectedUser({...activeUser, checkingBalance: e.target.value})} />
+                <Input type="number" value={selectedUser.checkingBalance ?? selectedUser.balance ?? 0} onChange={e => setSelectedUser({...selectedUser, checkingBalance: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>Saldo Ahorros</Label>
-                <Input type="number" value={activeUser.savingsBalance ?? 0} onChange={e => setSelectedUser({...activeUser, savingsBalance: e.target.value})} />
+                <Input type="number" value={selectedUser.savingsBalance ?? 0} onChange={e => setSelectedUser({...selectedUser, savingsBalance: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>{t.admin.role || "Rol"}</Label>
-                <Select value={activeUser.role} onValueChange={(value) => setSelectedUser({...activeUser, role: value})}>
+                <Select value={selectedUser.role || 'user'} onValueChange={(value) => setSelectedUser({...selectedUser, role: value})}>
                   <SelectTrigger className="bg-background/50">
                     <SelectValue />
                   </SelectTrigger>
@@ -862,14 +862,14 @@ export default function AdminUsersPage() {
         <DialogContent className="glass border-white/10 sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>{t.admin.deposit}</DialogTitle>
-            <DialogDescription>Añadir saldo a {activeUser?.fullName}.</DialogDescription>
+            <DialogDescription>Añadir saldo a {selectedUser?.fullName}.</DialogDescription>
           </DialogHeader>
-          {activeUser && (
+          {selectedUser && (
             <form onSubmit={handleDeposit} className="space-y-4">
               <div className="space-y-2">
                 <Label>{t.admin.current_balance}</Label>
                 <div className="text-2xl font-bold text-emerald-400">
-                  ${((Number(activeUser.checkingBalance ?? activeUser.balance) || 0) + (Number(activeUser.savingsBalance) || 0)).toLocaleString()}
+                  ${((Number(selectedUser.checkingBalance ?? selectedUser.balance) || 0) + (Number(selectedUser.savingsBalance) || 0)).toLocaleString()}
                 </div>
               </div>
               <div className="space-y-2">
