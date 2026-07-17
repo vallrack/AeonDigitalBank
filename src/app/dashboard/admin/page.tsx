@@ -82,13 +82,35 @@ export default function AdminUsersPage() {
   });
 
   const [flaggedTransactions, setFlaggedTransactions] = useState<any[]>([]);
-  const [loadingFlags, setLoadingFlags] = useState(false);
+  const userRef = currentUser ? doc(db, 'users', currentUser.uid) : null;
+  const { data: userData, loading: profileLoading } = useDoc(userRef);
 
   const usersQuery = useMemo(() => {
     return query(collection(db, 'users'), orderBy('createdAt', 'desc'));
   }, [db]);
 
   const { data: users, loading } = useCollection(usersQuery);
+
+  // TEMPORARY PATCH: Assign account numbers to users who don't have one
+  useEffect(() => {
+    if (!loading && users && users.length > 0 && userData?.role === 'admin') {
+      users.forEach(async (u) => {
+        if (!u.accountNumber) {
+          const newAccountNumber = "10" + Math.floor(10000000 + Math.random() * 90000000).toString();
+          try {
+            await updateDoc(doc(db, 'users', u.id), {
+              accountNumber: newAccountNumber
+            });
+            console.log(`Patched user ${u.email} with account number ${newAccountNumber}`);
+          } catch (e) {
+            console.error(`Failed to patch ${u.email}`, e);
+          }
+        }
+      });
+    }
+  }, [users, loading, userData, db]);
+
+  const [loadingFlags, setLoadingFlags] = useState(false);
 
   const filteredUsers = users.filter(u => 
     (u.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -628,7 +650,7 @@ export default function AdminUsersPage() {
                   <TableHeader>
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
                       <TableHead className="w-[250px]">{t.admin.client}</TableHead>
-                      <TableHead>Email</TableHead>
+                      <TableHead>Email / Cuenta</TableHead>
                       <TableHead className="text-right">{t.admin.checking}</TableHead>
                       <TableHead className="text-right">{t.admin.savings}</TableHead>
                       <TableHead>{t.admin.role}</TableHead>
@@ -664,7 +686,10 @@ export default function AdminUsersPage() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-slate-600">{u.email}</TableCell>
+                          <TableCell>
+                            <div className="font-mono text-xs text-indigo-500 font-medium">{u.accountNumber || 'N/A'}</div>
+                            <div className="text-slate-600 text-sm">{u.email}</div>
+                          </TableCell>
                           <TableCell className="text-right font-mono font-medium text-emerald-600">
                             ${(Number(u.checkingBalance ?? u.balance) || 0).toFixed(2)}
                           </TableCell>

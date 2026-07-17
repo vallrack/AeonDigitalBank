@@ -130,10 +130,19 @@ export default function DashboardPage() {
       animate="show"
       className="space-y-8"
     >
-      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-headline font-bold">{t.common.welcome}, {userData?.fullName?.split(' ')[0] || 'User'}</h1>
-          <p className="text-muted-foreground">{t.dashboard.status}</p>
+          <h1 className="text-3xl font-headline font-bold">
+            {t.dashboard.greeting.replace('{name}', userData?.fullName?.split(' ')[0] || 'User')}
+          </h1>
+          <div className="flex flex-col space-y-1 mt-1">
+            <p className="text-muted-foreground">{t.dashboard.status}</p>
+            {userData?.accountNumber && (
+              <p className="text-sm font-medium text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded-md inline-block w-fit">
+                N° de Cuenta: <span className="font-mono">{userData.accountNumber}</span>
+              </p>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-2">

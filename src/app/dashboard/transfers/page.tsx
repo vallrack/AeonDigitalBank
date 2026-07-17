@@ -70,6 +70,7 @@ export default function TransfersPage() {
     setIsProcessing(true);
     try {
       const cleanQuery = searchQuery.trim().toLowerCase();
+      const searchVal = cleanQuery.includes("@") ? cleanQuery : cleanQuery.replace(/\s+/g, '');
       let foundUser: any = null;
 
       if (cleanQuery.includes("@")) {
@@ -80,20 +81,34 @@ export default function TransfersPage() {
           foundUser.uid = snap.docs[0].id;
         }
       } else {
-        // Assume it's a card number. Search through users' virtualCards.
+        // Assume it's a card number OR an account number.
         const allUsersSnap = await getDocs(collection(db, 'users'));
         for (const uDoc of allUsersSnap.docs) {
-           const cardsSnap = await getDocs(collection(db, 'users', uDoc.id, 'virtualCards'));
-           const matchingCard = cardsSnap.docs.find(c => c.data().cardNumber === cleanQuery);
-           if (matchingCard) {
-              foundUser = uDoc.data();
+           const data = uDoc.data();
+           
+           // Check if it's an account number match
+           if (data.accountNumber === searchVal) {
+              foundUser = data;
               foundUser.uid = uDoc.id;
               break;
+           }
+
+           // Check if it's a virtual card match
+           try {
+             const cardsSnap = await getDocs(collection(db, 'users', uDoc.id, 'virtualCards'));
+             const matchingCard = cardsSnap.docs.find(c => c.data().cardNumber === searchVal);
+             if (matchingCard) {
+                foundUser = data;
+                foundUser.uid = uDoc.id;
+                break;
+             }
+           } catch (e) {
+             // Ignore permission errors for virtualCards subcollection
            }
         }
         
         if (!foundUser) {
-          toast({ variant: "destructive", title: t.common.error, description: "No se encontró el destinatario con esa tarjeta o correo." });
+          toast({ variant: "destructive", title: t.common.error, description: "No se encontró el destinatario con esa cuenta, tarjeta o correo." });
           setIsProcessing(false);
           return;
         }

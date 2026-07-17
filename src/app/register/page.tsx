@@ -218,6 +218,9 @@ export default function RegisterPage() {
         activationTime.setHours(activationTime.getHours() + 6); // Add 6 hours for standard users
       }
 
+      // Generate a 10 digit account number starting with 10 (e.g. 1048593021)
+      const newAccountNumber = "10" + Math.floor(10000000 + Math.random() * 90000000).toString();
+
       await setDoc(doc(db, 'users', user.uid), {
         fullName: formData.fullName,
         email: formData.email,
@@ -228,6 +231,7 @@ export default function RegisterPage() {
         createdAt: new Date().toISOString(),
         checkingBalance: 0,
         savingsBalance: 0,
+        accountNumber: newAccountNumber,
         hasKyc: true // lightweight flag only
       });
 
