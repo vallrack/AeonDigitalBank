@@ -91,20 +91,23 @@ export default function AdminUsersPage() {
 
   const { data: users, loading } = useCollection(usersQuery);
 
-  // TEMPORARY PATCH: Assign account numbers to users who don't have one
+  // ONE-TIME PATCH: Assign account numbers to users who don't have one
+  const accountPatchedRef = React.useRef(false);
   useEffect(() => {
+    if (accountPatchedRef.current) return; // Already ran, skip
     if (!loading && users && users.length > 0 && userData?.role === 'admin') {
-      users.forEach(async (u) => {
-        if (!u.accountNumber) {
-          const newAccountNumber = "10" + Math.floor(10000000 + Math.random() * 90000000).toString();
-          try {
-            await updateDoc(doc(db, 'users', u.id), {
-              accountNumber: newAccountNumber
-            });
-            console.log(`Patched user ${u.email} with account number ${newAccountNumber}`);
-          } catch (e) {
-            console.error(`Failed to patch ${u.email}`, e);
-          }
+      const usersToFix = users.filter(u => !u.accountNumber);
+      if (usersToFix.length === 0) {
+        accountPatchedRef.current = true; // Nothing to do, mark as done
+        return;
+      }
+      accountPatchedRef.current = true; // Mark as started so it never runs again
+      usersToFix.forEach(async (u) => {
+        const newAccountNumber = "10" + Math.floor(10000000 + Math.random() * 90000000).toString();
+        try {
+          await updateDoc(doc(db, 'users', u.id), { accountNumber: newAccountNumber });
+        } catch (e) {
+          console.error(`Failed to patch ${u.email}`, e);
         }
       });
     }
@@ -119,6 +122,8 @@ export default function AdminUsersPage() {
 
   const currentUserData = users.find(u => u.id === currentUser?.uid);
 
+  // Only re-fetch flagged transactions when user IDs change (not on balance updates)
+  const userIds = useMemo(() => users.map(u => u.id).join(','), [users]);
   useEffect(() => {
     const fetchFlagged = async () => {
       if (users.length === 0) return;
@@ -142,7 +147,8 @@ export default function AdminUsersPage() {
       }
     };
     fetchFlagged();
-  }, [users, db]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userIds, db]); // Only re-run when user list changes, NOT on balance updates
 
   const handleResolveFraud = async (tx: any, action: 'approve' | 'reject') => {
     if (!confirm(`¿Estás seguro de ${action === 'approve' ? 'APROBAR' : 'RECHAZAR'} esta transacción?`)) return;
