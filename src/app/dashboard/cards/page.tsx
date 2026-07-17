@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { VirtualCard, CardStyleType } from '@/components/banking/virtual-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +31,15 @@ export default function CardsPage() {
   const [customColor, setCustomColor] = useState('#1d4ed8');
   const [customBgImage, setCustomBgImage] = useState('');
   const [customLogo, setCustomLogo] = useState('');
+
+  // Single shared CVV timer for ALL cards — prevents multiple setInterval freezing the page
+  const [cvvTimer, setCvvTimer] = useState(300);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCvvTimer(prev => (prev <= 0 ? 300 : prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const cardsQuery = useMemo(() => {
     if (!user) return null;
@@ -385,6 +394,7 @@ export default function CardsPage() {
                       cardNumber={card.cardNumber}
                       expiryDate={card.expiryDate}
                       cvv={card.cvv}
+                      timer={cvvTimer}
                       isFrozen={card.isFrozen}
                       type={card.type as any}
                       variant={card.variant as any}

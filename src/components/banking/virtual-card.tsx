@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Shield, Zap, Recycle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +11,7 @@ interface VirtualCardProps {
   cardNumber: string;
   expiryDate: string;
   cvv: string;
+  timer?: number;
   isFrozen?: boolean;
   type?: CardStyleType;
   variant?: 'standard' | 'fifa';
@@ -27,6 +28,7 @@ export function VirtualCard({
   cardNumber, 
   expiryDate, 
   cvv, 
+  timer = 300,
   isFrozen = false,
   type = 'customized-cash',
   variant = 'standard',
@@ -38,14 +40,6 @@ export function VirtualCard({
   customLogo
 }: VirtualCardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
-  const [timer, setTimer] = useState(300);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimer(prev => (prev <= 0 ? 300 : prev - 1));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
