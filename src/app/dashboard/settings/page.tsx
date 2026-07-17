@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,8 @@ import {
   Check, 
   Palette,
   Eye,
-  ShieldCheck
+  ShieldCheck,
+  Camera
 } from 'lucide-react';
 import { useUser, useFirestore, useDoc } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -36,14 +37,33 @@ export default function SettingsPage() {
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [profilePicture, setProfilePicture] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (userData) {
       setName(userData.fullName || '');
       setPhone(userData.phoneNumber || '');
+      setProfilePicture(userData.profilePicture || '');
     }
   }, [userData]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 500 * 1024) { // 500KB max to avoid Firestore 1MB doc limit
+      toast({ variant: "destructive", title: t.common.error, description: "La imagen debe pesar menos de 500KB" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setProfilePicture(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleUpdateProfile = async () => {
     if (!user || !name) return;
@@ -51,7 +71,8 @@ export default function SettingsPage() {
     try {
       await updateDoc(doc(db, 'users', user.uid), {
         fullName: name,
-        phoneNumber: phone
+        phoneNumber: phone,
+        profilePicture: profilePicture
       });
       toast({ title: t.settings.success_profile, description: t.settings.success_profile_desc });
     } catch (error) {
@@ -82,10 +103,17 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <Card className="lg:col-span-1 glass border-primary/5">
               <CardHeader className="text-center">
-                <Avatar className="h-24 w-24 mx-auto border-4 border-primary/20 mb-4">
-                  <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/200/200`} />
-                  <AvatarFallback>{name.substring(0,2).toUpperCase()}</AvatarFallback>
-                </Avatar>
+                <div className="relative w-24 h-24 mx-auto mb-4 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                  <Avatar className="h-24 w-24 border-4 border-primary/20">
+                    <AvatarImage src={profilePicture || `https://picsum.photos/seed/${user?.uid}/200/200`} className="object-cover" />
+                    <AvatarFallback>{name.substring(0,2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera size={20} className="text-white mb-1" />
+                    <span className="text-[9px] font-bold text-white uppercase tracking-wider">Cambiar</span>
+                  </div>
+                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                </div>
                 <CardTitle className="font-headline">{name}</CardTitle>
                 <CardDescription>{user?.email}</CardDescription>
                 <div className="mt-4 flex justify-center">
