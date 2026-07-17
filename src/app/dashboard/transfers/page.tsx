@@ -80,9 +80,23 @@ export default function TransfersPage() {
           foundUser.uid = snap.docs[0].id;
         }
       } else {
-        toast({ variant: "destructive", title: t.common.error, description: "Please search by email." });
-        setIsProcessing(false);
-        return;
+        // Assume it's a card number. Search through users' virtualCards.
+        const allUsersSnap = await getDocs(collection(db, 'users'));
+        for (const uDoc of allUsersSnap.docs) {
+           const cardsSnap = await getDocs(collection(db, 'users', uDoc.id, 'virtualCards'));
+           const matchingCard = cardsSnap.docs.find(c => c.data().cardNumber === cleanQuery);
+           if (matchingCard) {
+              foundUser = uDoc.data();
+              foundUser.uid = uDoc.id;
+              break;
+           }
+        }
+        
+        if (!foundUser) {
+          toast({ variant: "destructive", title: t.common.error, description: "No se encontró el destinatario con esa tarjeta o correo." });
+          setIsProcessing(false);
+          return;
+        }
       }
 
       if (!foundUser) throw new Error("Not found");

@@ -39,8 +39,9 @@ service cloud.firestore {
       }
       
       match /virtualCards/{cardId} {
-        // Users can create/update their own cards, admins can view
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
+        // Users can create/update their own cards. All users can read for transfer routing.
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
       }
 
       match /kyc/{kycId} {
