@@ -132,12 +132,24 @@ export default function AdminUsersPage() {
       
       if (action === 'approve') {
         // Just mark as completed, money was already deducted from checkingBalance as "held"
-        batch.update(txRef, { status: 'completed', flagged: false, flagReason: 'Aprobado por Admin' });
+        batch.update(txRef, { status: 'Completed', flagged: false, flagReason: 'Aprobado por Admin' });
         
         // If it was a transfer to someone else, we need to add the money to the recipient
         if (tx.recipientId) {
           const recipientRef = doc(db, 'users', tx.recipientId);
           batch.update(recipientRef, { checkingBalance: increment(tx.amount) });
+
+          // Find and approve recipient's transaction as well
+          const recipientTxsQuery = query(
+            collection(db, 'users', tx.recipientId, 'transactions'),
+            where('senderId', '==', tx.userId),
+            where('amount', '==', tx.amount),
+            where('status', '==', 'pending')
+          );
+          const recipientTxsSnap = await getDocs(recipientTxsQuery);
+          recipientTxsSnap.forEach(docSnap => {
+             batch.update(docSnap.ref, { status: 'Completed', flagged: false });
+          });
         }
       } else {
         // Reject: refund the money back to the user

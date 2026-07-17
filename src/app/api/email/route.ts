@@ -216,6 +216,30 @@ export async function POST(req: Request) {
         </body>
         </html>
       `;
+    } else if (type === 'otp') {
+      subject = `Código de Seguridad - Bank of Americans`;
+      htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head><style>${baseStyles}</style></head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Bank of Americans - Seguridad</h1>
+            </div>
+            <div class="content">
+              <p>Hola ${to.name},</p>
+              <p>Se ha solicitado un código de verificación para autorizar una transacción en tu cuenta.</p>
+              <div class="amount">${data.otpCode}</div>
+              <p>Si no fuiste tú quien solicitó este código, por favor contacta a soporte inmediatamente.</p>
+            </div>
+            <div class="footer">
+              El equipo de prevención de fraudes de Bank of Americans.
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
     }
 
     const brevoPayload = {

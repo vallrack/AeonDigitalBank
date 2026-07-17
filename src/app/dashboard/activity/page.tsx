@@ -70,7 +70,7 @@ export default function ActivityPage() {
         tx.category || '',
         tx.reference || '',
         `${tx.type === 'expense' ? '-' : '+'}$${Math.abs(tx.amount || 0).toFixed(2)}`,
-        tx.status === 'Completed' ? (language === 'es' ? 'Completada' : 'Completed') : (language === 'es' ? 'Pendiente' : 'Pending')
+        tx.status?.toLowerCase() === 'completed' ? (language === 'es' ? 'Completada' : 'Completed') : (language === 'es' ? 'Pendiente' : 'Pending')
       ];
       tableRows.push(txData);
     });
@@ -200,10 +200,10 @@ export default function ActivityPage() {
                         <div className="flex items-center gap-1.5">
                           <div className={cn(
                             "w-1.5 h-1.5 rounded-full",
-                            tx.status === 'Completed' ? "bg-emerald-400" : "bg-amber-400"
+                            tx.status?.toLowerCase() === 'completed' ? "bg-emerald-400" : "bg-amber-400"
                           )} />
                           <span className="text-[10px] font-bold uppercase tracking-tighter">
-                            {tx.status === 'Completed' ? (language === 'es' ? 'Completada' : 'Completed') : (language === 'es' ? 'Pendiente' : 'Pending')}
+                            {tx.status?.toLowerCase() === 'completed' ? (language === 'es' ? 'Completada' : 'Completed') : (language === 'es' ? 'Pendiente' : 'Pending')}
                           </span>
                         </div>
                       </TableCell>

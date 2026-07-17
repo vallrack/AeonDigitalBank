@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2, Search, User, CreditCard, Sparkles, RefreshCw } from 'lucide-react';
 import { useUser, useFirestore, useDoc } from '@/firebase';
 import { doc, collection, query, where, getDocs, writeBatch, increment } from 'firebase/firestore';
+import { getAuth, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n/context';
@@ -43,6 +44,8 @@ export default function TransfersPage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [expectedOtp, setExpectedOtp] = useState<string | null>(null);
+  const [authMethod, setAuthMethod] = useState<'sms' | 'email' | 'password'>('sms');
+  const [authPassword, setAuthPassword] = useState('');
   const [isAuthVerifying, setIsAuthVerifying] = useState(false);
   const [useOtpFallback, setUseOtpFallback] = useState(false);
   const [hasBiometrics, setHasBiometrics] = useState(false);
@@ -154,7 +157,30 @@ export default function TransfersPage() {
     }
     
     setUseOtpFallback(false);
+    setAuthMethod('sms');
     setAuthModalOpen(true);
+  };
+
+  const sendOtpByEmail = async () => {
+    setIsProcessing(true);
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setExpectedOtp(newOtp);
+    try {
+      await fetch('/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: { email: userData.email, name: userData.fullName },
+          type: 'otp',
+          data: { otpCode: newOtp }
+        })
+      });
+      toast({ title: "Correo Enviado", description: "Se ha enviado un código a tu correo electrónico." });
+      setAuthMethod('email');
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo enviar el correo." });
+    }
+    setIsProcessing(false);
   };
 
   const handleVerifyAndTransfer = async (e?: React.FormEvent) => {
@@ -181,8 +207,16 @@ export default function TransfersPage() {
           }
         });
         if (!credential) throw new Error("Verificación biométrica cancelada");
+      } else if (authMethod === 'password') {
+        const auth = getAuth();
+        if (auth.currentUser && user?.email) {
+          const credential = EmailAuthProvider.credential(user.email, authPassword);
+          await reauthenticateWithCredential(auth.currentUser, credential);
+        } else {
+           throw new Error("Usuario no autenticado");
+        }
       } else {
-        // Validación OTP Clásica
+        // Validación OTP Clásica (SMS o Email)
         if (otpCode !== expectedOtp && expectedOtp !== null) {
           throw new Error("Código OTP incorrecto.");
         }
@@ -668,26 +702,65 @@ export default function TransfersPage() {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleVerifyAndTransfer} className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Código OTP SMS</Label>
-                <Input 
-                  type="text" 
-                  maxLength={6}
-                  value={otpCode} 
-                  onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Ej. 123456"
-                  required
-                  className="text-center tracking-widest text-lg font-mono"
-                />
-                <p className="text-xs text-muted-foreground text-center pt-2">
-                  Revisa los mensajes SMS de tu teléfono.
-                </p>
+                <form onSubmit={handleVerifyAndTransfer} className="space-y-4 py-4">
+              {authMethod === 'password' ? (
+                <div className="space-y-2">
+                  <Label>Contraseña de tu cuenta</Label>
+                  <Input 
+                    type="password" 
+                    value={authPassword} 
+                    onChange={e => setAuthPassword(e.target.value)}
+                    placeholder="Ingresa tu contraseña"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground text-center pt-2">
+                    Ingresa la misma contraseña que usas para iniciar sesión.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Código de Seguridad {authMethod === 'sms' ? '(SMS)' : '(Correo)'}</Label>
+                  <Input 
+                    type="text" 
+                    maxLength={6}
+                    value={otpCode} 
+                    onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Ej. 123456"
+                    required
+                    className="text-center tracking-widest text-lg font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground text-center pt-2">
+                    {authMethod === 'sms' ? 'Revisa los mensajes SMS de tu teléfono.' : 'Revisa la bandeja de entrada de tu correo.'}
+                  </p>
+                </div>
+              )}
+              
+              <div className="flex flex-col items-center justify-center space-y-2 mt-4 pt-4 border-t border-white/10">
+                <p className="text-xs text-muted-foreground">¿Problemas con este método? Prueba otro:</p>
+                <div className="flex gap-2">
+                  {authMethod !== 'sms' && (
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setAuthMethod('sms')} className="text-xs">
+                      Usar SMS
+                    </Button>
+                  )}
+                  {authMethod !== 'email' && (
+                    <Button type="button" variant="secondary" size="sm" onClick={sendOtpByEmail} className="text-xs">
+                      Usar Correo
+                    </Button>
+                  )}
+                  {authMethod !== 'password' && (
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setAuthMethod('password')} className="text-xs">
+                      Usar Contraseña
+                    </Button>
+                  )}
+                </div>
               </div>
-              <DialogFooter>
-                <Button type="button" variant="ghost" onClick={() => setAuthModalOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={isAuthVerifying} className="glow-indigo">
-                  {isAuthVerifying ? "Verificando..." : "Confirmar Transferencia"}
+
+              <DialogFooter className="mt-4">
+                <Button type="button" variant="outline" onClick={() => setAuthModalOpen(false)}>Cancelar</Button>
+                <Button type="submit" className="glow-indigo" disabled={isAuthVerifying}>
+                  {isAuthVerifying ? <Loader2 className="animate-spin mr-2" /> : <ShieldCheck className="mr-2" />}
+                  Verificar y Enviar
                 </Button>
               </DialogFooter>
             </form>
