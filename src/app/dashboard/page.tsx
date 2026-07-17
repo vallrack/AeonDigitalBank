@@ -133,7 +133,7 @@ export default function DashboardPage() {
       <motion.div variants={itemVariants} className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-headline font-bold">
-            {t.dashboard.greeting.replace('{name}', userData?.fullName?.split(' ')[0] || 'User')}
+            {t.common.welcome}, {userData?.fullName?.split(' ')[0] || 'User'}
           </h1>
           <div className="flex flex-col space-y-1 mt-1">
             <p className="text-muted-foreground">{t.dashboard.status}</p>
