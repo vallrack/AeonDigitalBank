@@ -244,12 +244,12 @@ export function VirtualCard({
                    <div className={cn("font-mono text-[13px] sm:text-[15px] tracking-widest drop-shadow-md", bankOfAmericaTextColor)}>
                      {formattedCardNumber}
                    </div>
-                   <div className="flex justify-between items-center mt-0.5 pr-8">
-                     <div className={cn("flex items-center gap-2", bankOfAmericaTextColor)}>
+                   <div className={cn("flex flex-col mt-0.5", bankOfAmericaTextColor)}>
+                     <div className="flex items-center gap-2">
                        <span className="text-[5px] uppercase tracking-tighter leading-none opacity-80">VALID<br/>THRU</span>
                        <span className="font-mono text-[10px]">{expiryDate}</span>
                      </div>
-                     <span className={cn("font-sans text-[8px] uppercase tracking-wide truncate max-w-[120px]", bankOfAmericaTextColor)}>
+                     <span className={cn("font-sans text-[8px] uppercase tracking-widest truncate max-w-[160px] mt-0.5 font-semibold", bankOfAmericaTextColor)}>
                        {cardHolder}
                      </span>
                    </div>

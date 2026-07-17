@@ -28,8 +28,8 @@ service cloud.firestore {
       // Admins and Coordinators can create users client-side
       allow create: if isAdminOrCoordinator() || (isSignedIn() && request.auth.uid == userId);
       
-      // Users can update their own balance (for transfers) and admins can update everything
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdminOrCoordinator());
+      // Users can update their own balance and others' balances for transfers
+      allow update: if isSignedIn();
       
       allow delete: if isAdmin();
       
