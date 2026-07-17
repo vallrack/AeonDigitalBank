@@ -42,6 +42,7 @@ export default function TransfersPage() {
   // Auth Verification State
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [otpCode, setOtpCode] = useState('');
+  const [expectedOtp, setExpectedOtp] = useState<string | null>(null);
   const [isAuthVerifying, setIsAuthVerifying] = useState(false);
   const [useOtpFallback, setUseOtpFallback] = useState(false);
   const [hasBiometrics, setHasBiometrics] = useState(false);
@@ -126,7 +127,32 @@ export default function TransfersPage() {
   };
 
   const confirmTransfer = async () => {
-    // En lugar de enviar directo, abrimos el modal de seguridad
+    if (!userData?.phoneNumber) {
+      toast({ variant: "destructive", title: "Atención", description: "No tienes un número de teléfono para recibir el SMS de seguridad. Ingresa 123456." });
+      // If no phone number, fallback to '123456' so the user isn't stuck.
+      setExpectedOtp('123456');
+    } else {
+      setIsProcessing(true);
+      const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      setExpectedOtp(newOtp);
+      
+      try {
+        await fetch('/api/sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phoneNumber: userData.phoneNumber,
+            otpCode: newOtp
+          })
+        });
+        toast({ title: "SMS Enviado", description: "Se ha enviado un código a tu celular registrado." });
+      } catch (err) {
+        console.error(err);
+        toast({ variant: "destructive", title: "Error", description: "No se pudo enviar el SMS. Intenta más tarde." });
+      }
+      setIsProcessing(false);
+    }
+    
     setUseOtpFallback(false);
     setAuthModalOpen(true);
   };
@@ -157,8 +183,8 @@ export default function TransfersPage() {
         if (!credential) throw new Error("Verificación biométrica cancelada");
       } else {
         // Validación OTP Clásica
-        if (otpCode !== '123456') {
-          throw new Error("Código OTP incorrecto. Use 123456 para la simulación.");
+        if (otpCode !== expectedOtp && expectedOtp !== null) {
+          throw new Error("Código OTP incorrecto.");
         }
       }
 
@@ -655,7 +681,7 @@ export default function TransfersPage() {
                   className="text-center tracking-widest text-lg font-mono"
                 />
                 <p className="text-xs text-muted-foreground text-center pt-2">
-                  (Simulación: Usa el código maestro 123456)
+                  Revisa los mensajes SMS de tu teléfono.
                 </p>
               </div>
               <DialogFooter>

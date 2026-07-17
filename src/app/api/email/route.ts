@@ -18,8 +18,8 @@ export async function POST(req: Request) {
     }
 
     const sender = {
-      name: "Bank of Americans",
-      email: "no-reply@bankofamericans.com" // Brevo account must have this verified or it might fail, we'll warn user
+      name: "Aeon Digital Bank",
+      email: process.env.BREVO_SENDER_EMAIL || "no-reply@bankofamericans.com"
     };
 
     let subject = '';

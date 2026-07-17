@@ -38,6 +38,7 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
+    phoneNumber: '',
     password: '',
     dob: '',
     address: '',
@@ -220,6 +221,7 @@ export default function RegisterPage() {
       await setDoc(doc(db, 'users', user.uid), {
         fullName: formData.fullName,
         email: formData.email,
+        phoneNumber: formData.phoneNumber,
         role: userRole,
         status: isAdmin ? 'active' : 'pending',
         activationTime: activationTime.toISOString(),
@@ -359,6 +361,17 @@ export default function RegisterPage() {
                   className="bg-white/5 border-white/10"
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phoneNumber">Teléfono (con código de país, ej. +52)</Label>
+                <Input 
+                  id="phoneNumber" 
+                  type="tel" 
+                  placeholder="+52 123 456 7890" 
+                  className="bg-white/5 border-white/10"
+                  value={formData.phoneNumber}
+                  onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
                 />
               </div>
               <div className="space-y-2">
