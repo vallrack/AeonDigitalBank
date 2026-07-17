@@ -118,8 +118,8 @@ function TopNav({ userData }: { userData: any }) {
           <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full" />
         </Button>
         <Avatar className="h-8 w-8 border border-primary/20">
-          <AvatarImage src={`https://picsum.photos/seed/${user?.uid || 'bofa'}/100/100`} />
-          <AvatarFallback>{user?.email?.substring(0,2).toUpperCase() || 'AD'}</AvatarFallback>
+          <AvatarImage src={userData?.profilePicture || `https://picsum.photos/seed/${user?.uid || 'bofa'}/100/100`} className="object-cover" />
+          <AvatarFallback>{userData?.fullName?.substring(0,2).toUpperCase() || user?.email?.substring(0,2).toUpperCase() || 'AD'}</AvatarFallback>
         </Avatar>
       </div>
     </header>
