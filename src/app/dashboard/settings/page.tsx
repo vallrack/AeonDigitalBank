@@ -35,10 +35,14 @@ export default function SettingsPage() {
   const { data: userData, loading } = useDoc(userRef);
 
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (userData) setName(userData.fullName || '');
+    if (userData) {
+      setName(userData.fullName || '');
+      setPhone(userData.phoneNumber || '');
+    }
   }, [userData]);
 
   const handleUpdateProfile = async () => {
@@ -46,7 +50,8 @@ export default function SettingsPage() {
     setIsSaving(true);
     try {
       await updateDoc(doc(db, 'users', user.uid), {
-        fullName: name
+        fullName: name,
+        phoneNumber: phone
       });
       toast({ title: t.settings.success_profile, description: t.settings.success_profile_desc });
     } catch (error) {
@@ -132,11 +137,13 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">{t.settings.phone}</Label>
+                  <Label htmlFor="phone">{t.settings.phone} <span className="text-muted-foreground text-xs">(Obligatorio código de país, ej: +57)</span></Label>
                   <Input 
                     id="phone" 
-                    placeholder="+34 600 000 000" 
+                    placeholder="+57 300 000 0000" 
                     className="bg-white/5 border-white/10"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                   />
                 </div>
               </CardContent>
