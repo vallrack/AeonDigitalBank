@@ -73,6 +73,7 @@ export default function TransfersPage() {
         const snap = await getDocs(q);
         if (!snap.empty) {
           foundUser = snap.docs[0].data();
+          foundUser.uid = snap.docs[0].id;
         }
       } else {
         toast({ variant: "destructive", title: t.common.error, description: "Please search by email." });
