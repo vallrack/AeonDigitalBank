@@ -83,6 +83,26 @@ export default function SecurityPage() {
     }
   };
 
+  const handleToggleSms = async (checked: boolean) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { smsAuthEnabled: checked });
+      toast({ title: t.common.success, description: "Preferencia de SMS actualizada" });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: t.common.error, description: error.message });
+    }
+  };
+
+  const handleToggleAuthApp = async (checked: boolean) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { authAppEnabled: checked });
+      toast({ title: t.common.success, description: "Preferencia de Auth App actualizada" });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: t.common.error, description: error.message });
+    }
+  };
+
   const handleConfirmBioPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !user.email) return;
@@ -180,14 +200,20 @@ export default function SecurityPage() {
                   <Label className="text-base">{t.security.sms}</Label>
                   <p className="text-xs text-muted-foreground">{t.security.sms_desc}</p>
                 </div>
-                <Switch />
+                <Switch 
+                  checked={!!userData?.smsAuthEnabled}
+                  onCheckedChange={handleToggleSms}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label className="text-base">{t.security.auth_app}</Label>
                   <p className="text-xs text-muted-foreground">{t.security.auth_app_desc}</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch 
+                  checked={!!userData?.authAppEnabled}
+                  onCheckedChange={handleToggleAuthApp}
+                />
               </div>
             </CardContent>
           </Card>
