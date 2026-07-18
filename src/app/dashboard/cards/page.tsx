@@ -46,8 +46,13 @@ export default function CardsPage() {
     return collection(db, 'users', user.uid, 'virtualCards');
   }, [db, user]);
 
+  const userDocRef = useMemo(() => {
+    if (!user) return null;
+    return doc(db, 'users', user.uid);
+  }, [db, user]);
+
   const { data: cards, loading: cardsLoading } = useCollection(cardsQuery);
-  const { data: userData } = useDoc(user ? doc(db, 'users', user.uid) : null);
+  const { data: userData } = useDoc(userDocRef);
 
   const [purchaseMerchant, setPurchaseMerchant] = useState('');
   const [purchaseAmount, setPurchaseAmount] = useState('');
