@@ -336,6 +336,30 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleUnfreezeAccount = async (u: any) => {
+    try {
+      await updateDoc(doc(db, 'users', u.id), {
+        status: 'active'
+      });
+      toast({ title: "Cuenta descongelada exitosamente" });
+      
+      fetch('/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: { email: u.email, name: u.fullName },
+          type: 'unfreeze',
+          data: {
+            name: u.fullName,
+            unfreezeDate: new Date().toISOString()
+          }
+        })
+      }).catch(console.error);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: t.common.error, description: e.message });
+    }
+  };
+
   const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser || !depositAmount || Number(depositAmount) <= 0) return;
@@ -712,6 +736,11 @@ export default function AdminUsersPage() {
                                   Pendiente
                                 </Badge>
                               )}
+                              {u.status === 'frozen' && (
+                                <Badge variant="outline" className="text-red-500 border-red-500/30 bg-red-500/10 text-[10px]">
+                                  Congelado
+                                </Badge>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
@@ -727,6 +756,11 @@ export default function AdminUsersPage() {
                                 {u.status === 'pending' && (
                                   <DropdownMenuItem onClick={() => handleActivateAccount(u)} className="text-amber-600 focus:text-amber-600 focus:bg-amber-50">
                                     <ShieldAlert className="mr-2 h-4 w-4" /> Activar Ahora
+                                  </DropdownMenuItem>
+                                )}
+                                {u.status === 'frozen' && (
+                                  <DropdownMenuItem onClick={() => handleUnfreezeAccount(u)} className="text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50">
+                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Descongelar Cuenta
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuItem onClick={() => { 

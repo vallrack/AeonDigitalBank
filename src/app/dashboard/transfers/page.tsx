@@ -8,9 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2, Search, User, CreditCard, Sparkles, RefreshCw } from 'lucide-react';
+import { ArrowRightLeft, ShieldCheck, AlertTriangle, Loader2, CheckCircle2, Search, User, CreditCard, Sparkles, RefreshCw, Building, Lock } from 'lucide-react';
 import { useUser, useFirestore, useDoc } from '@/firebase';
-import { doc, collection, query, where, getDocs, writeBatch, increment } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, writeBatch, increment, updateDoc } from 'firebase/firestore';
 import { getAuth, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -29,6 +29,14 @@ export default function TransfersPage() {
   const checkingBalance = Number(userData?.checkingBalance ?? userData?.balance ?? 0);
   const savingsBalance = Number(userData?.savingsBalance ?? 0);
 
+  // Transfer Type State
+  const [activeTransferType, setActiveTransferType] = useState<'zelle' | 'external'>('zelle');
+
+  // External Bank State
+  const [externalBank, setExternalBank] = useState('');
+  const [externalAccountName, setExternalAccountName] = useState('');
+  const [externalAccountNumber, setExternalAccountNumber] = useState('');
+  
   // Zelle State
   const [searchQuery, setSearchQuery] = useState('');
   const [recipientUser, setRecipientUser] = useState<any>(null);
@@ -137,8 +145,33 @@ export default function TransfersPage() {
     }
   };
 
+  const handleExternalTransferInit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amount || parseFloat(amount) <= 0) {
+      toast({ variant: "destructive", title: t.common.error, description: t.transfers.err_amount_req });
+      return;
+    }
+    if (parseFloat(amount) > availableBalance) {
+      toast({ variant: "destructive", title: t.common.error, description: t.transfers.err_insufficient });
+      return;
+    }
+    if (!externalBank || !externalAccountName || !externalAccountNumber) {
+      toast({ variant: "destructive", title: t.common.error, description: "Todos los campos del banco son obligatorios." });
+      return;
+    }
+
+    setActiveTransferType('external');
+    setIsProcessing(true);
+    setTimeout(() => {
+        setFraudResult({ isSuspicious: true, alertLevel: 'High', reason: 'Transferencia externa detectada.' });
+        setStep(3);
+        setIsProcessing(false);
+    }, 800);
+  };
+
   const handleTransferInit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setActiveTransferType('zelle');
     if (!amount || parseFloat(amount) <= 0) {
       toast({ variant: "destructive", title: t.common.error, description: t.transfers.err_amount_req });
       return;
@@ -214,7 +247,8 @@ export default function TransfersPage() {
 
   const handleVerifyAndTransfer = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!user || !userData || !recipientUser) return;
+    if (!user || !userData) return;
+    if (activeTransferType === 'zelle' && !recipientUser) return;
     
     setIsAuthVerifying(true);
 
@@ -254,18 +288,29 @@ export default function TransfersPage() {
       setAuthModalOpen(false);
       setIsProcessing(true);
 
+      // Verify pending transactions to freeze if >= 3
+      const pendingQuery = query(collection(db, 'users', user.uid, 'transactions'), where('status', '==', 'pending'));
+      const pendingSnap = await getDocs(pendingQuery);
+      
+      let willFreeze = false;
+      if (pendingSnap.size >= 2) {
+         willFreeze = true; // This one makes it 3
+      }
+
       // 2. Lógica Anti-Fraude
       const numAmount = parseFloat(amount);
-      const isHighAmount = numAmount >= 1000;
+      const isHighAmount = activeTransferType === 'external' ? true : numAmount >= 1000;
       const finalStatus = isHighAmount ? 'pending' : 'Completed';
       
       const batch = writeBatch(db);
       
       const senderRef = doc(db, 'users', user.uid);
-      const recipientRef = doc(db, 'users', recipientUser.uid);
       
-      const senderTxRef = doc(collection(db, 'users', user.uid, 'transactions'));
-      const recipientTxRef = doc(collection(db, 'users', recipientUser.uid, 'transactions'));
+      if (willFreeze) {
+        batch.update(senderRef, { status: 'frozen' });
+      }
+
+      const recipientRef = activeTransferType === 'zelle' ? doc(db, 'users', recipientUser.uid) : null;
 
       const senderField = sourceAccount === 'checking' ? 'checkingBalance' : 'savingsBalance';
       const destField = 'checkingBalance';
@@ -273,43 +318,54 @@ export default function TransfersPage() {
       // Al emisor siempre se le resta el dinero
       batch.update(senderRef, { [senderField]: increment(-numAmount) });
       
-      // Al receptor solo se le suma si NO es fraude
-      if (!isHighAmount) {
+      // Al receptor solo se le suma si NO es fraude y es zelle
+      if (!isHighAmount && recipientRef) {
         batch.update(recipientRef, { [destField]: increment(numAmount) });
       }
+
+      const merchantName = activeTransferType === 'external' 
+         ? `Transferencia a ${externalBank} - ${externalAccountName}` 
+         : `Transferencia a ${recipientUser.fullName}`;
+
+      const txFlagReason = activeTransferType === 'external' 
+         ? "Revisión de transferencia externa" 
+         : "High amount transfer";
 
       // Transacción Emisor
       batch.set(senderTxRef, {
         userId: user.uid,
-        merchant: `Transferencia a ${recipientUser.fullName}`,
+        merchant: merchantName,
         amount: numAmount,
         category: aiCategory || "Transfer",
         status: finalStatus,
         flagged: isHighAmount,
-        flagReason: isHighAmount ? "High amount transfer" : null,
+        flagReason: isHighAmount ? txFlagReason : null,
         date: new Date().toISOString(),
         type: "expense",
         reference: reference || "",
-        recipientId: recipientUser.uid,
+        recipientId: recipientUser?.uid || null,
         account: sourceAccount,
-        network: "AEON_INTERNAL"
+        network: activeTransferType === 'external' ? "EXTERNAL" : "AEON_INTERNAL"
       });
 
-      // Transacción Receptor
-      batch.set(recipientTxRef, {
-        userId: recipientUser.uid,
-        merchant: `Transferencia de ${userData.fullName}`,
-        amount: numAmount,
-        category: "Income",
-        status: finalStatus,
-        flagged: isHighAmount,
-        date: new Date().toISOString(),
-        type: "income",
-        reference: reference || "",
-        senderId: user.uid,
-        account: "checking",
-        network: "AEON_INTERNAL"
-      });
+      // Transacción Receptor (solo para Zelle)
+      if (recipientRef) {
+        const recipientTxRef = doc(collection(db, 'users', recipientUser.uid, 'transactions'));
+        batch.set(recipientTxRef, {
+          userId: recipientUser.uid,
+          merchant: `Transferencia de ${userData.fullName}`,
+          amount: numAmount,
+          category: "Income",
+          status: finalStatus,
+          flagged: isHighAmount,
+          date: new Date().toISOString(),
+          type: "income",
+          reference: reference || "",
+          senderId: user.uid,
+          account: "checking",
+          network: "AEON_INTERNAL"
+        });
+      }
 
       await batch.commit();
 
@@ -318,7 +374,7 @@ export default function TransfersPage() {
       const transferData = {
         amount: numAmount,
         senderName: userData.fullName,
-        receiverName: recipientUser.fullName,
+        receiverName: activeTransferType === 'external' ? externalAccountName : (recipientUser?.fullName || 'Desconocido'),
         date: transferDate,
         reference: reference || 'N/A'
       };
@@ -354,16 +410,26 @@ export default function TransfersPage() {
           })
         }).catch(err => console.error("Error sending receipt email:", err));
 
-        // Notify recipient (Received)
-        fetch('/api/email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: { email: recipientUser.email, name: recipientUser.fullName },
-            type: 'received',
-            data: transferData
-          })
-        }).catch(err => console.error("Error sending received email:", err));
+        // Notify recipient (Received) - only for Zelle
+        if (activeTransferType === 'zelle') {
+          fetch('/api/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: { email: recipientUser.email, name: recipientUser.fullName },
+              type: 'received',
+              data: transferData
+            })
+          }).catch(err => console.error("Error sending received email:", err));
+        }
+      }
+
+      if (willFreeze) {
+        toast({ 
+          variant: "destructive",
+          title: "Cuenta Bloqueada",
+          description: "Has superado el límite de operaciones en revisión. Tu cuenta ha sido bloqueada por seguridad."
+        });
       }
 
       setStep(4);
@@ -452,6 +518,27 @@ export default function TransfersPage() {
     }
   };
 
+  if (userData?.status === 'frozen') {
+    return (
+      <div className="max-w-2xl mx-auto mt-20 p-8 animate-in fade-in slide-in-from-bottom-4">
+        <Card className="border-red-500 bg-red-500/10 text-center">
+          <CardHeader>
+            <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock className="text-red-500" size={40} />
+            </div>
+            <CardTitle className="text-2xl text-red-500">Cuenta Congelada</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Tu cuenta ha sido bloqueada temporalmente por seguridad debido a múltiples intentos de transferencia bajo revisión. 
+              Por favor, contacta con soporte o espera a que un administrador revise tu caso.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="text-center space-y-2">
@@ -460,9 +547,10 @@ export default function TransfersPage() {
       </div>
 
       <Tabs defaultValue="zelle" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-8 bg-black/20">
-          <TabsTrigger value="zelle">Transferencias (Zelle)</TabsTrigger>
-          <TabsTrigger value="internal">Cuentas Propias</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 mb-8 bg-black/20">
+          <TabsTrigger value="zelle">Zelle</TabsTrigger>
+          <TabsTrigger value="external">Otros Bancos</TabsTrigger>
+          <TabsTrigger value="internal">Propias</TabsTrigger>
         </TabsList>
         
         <TabsContent value="zelle">
@@ -626,6 +714,169 @@ export default function TransfersPage() {
                     setRecipientUser(null);
                     setReference('');
                     setAiCategory('Transfer');
+                    setExternalBank('');
+                    setExternalAccountName('');
+                    setExternalAccountNumber('');
+                  }}>
+                    {t.transfers.another_transfer}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+        </TabsContent>
+
+        <TabsContent value="external">
+           {step === 1 && (
+              <Card className="glass border-primary/10 animate-in slide-in-from-right-4">
+                <CardHeader>
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <Building className="text-primary" size={20} />
+                    Transferencia a Banco Externo
+                  </CardTitle>
+                  <CardDescription>Envía fondos a cuentas de otras instituciones bancarias reales.</CardDescription>
+                </CardHeader>
+                <form onSubmit={handleExternalTransferInit}>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <Label>Banco Destino</Label>
+                      <Input 
+                        placeholder="Ej. Chase, Bank of America, Wells Fargo..." 
+                        value={externalBank}
+                        onChange={(e) => setExternalBank(e.target.value)}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Nombre del Titular</Label>
+                      <Input 
+                        placeholder="Nombre completo" 
+                        value={externalAccountName}
+                        onChange={(e) => setExternalAccountName(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Número de Cuenta / Routing</Label>
+                      <Input 
+                        placeholder="0000000000" 
+                        value={externalAccountNumber}
+                        onChange={(e) => setExternalAccountNumber(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Desde mi cuenta</Label>
+                      <Select value={sourceAccount} onValueChange={(val: 'checking' | 'savings') => setSourceAccount(val)}>
+                        <SelectTrigger className="bg-background/50">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="glass">
+                          <SelectItem value="checking">Cheques (Disponible: ${checkingBalance.toLocaleString()})</SelectItem>
+                          <SelectItem value="savings">Ahorros (Disponible: ${savingsBalance.toLocaleString()})</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="ext-amount">{t.transfers.amount_label}</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                        <Input 
+                          id="ext-amount" 
+                          type="number" 
+                          className="pl-7 text-xl font-headline" 
+                          placeholder="0.00" 
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="ext-reference">{t.transfers.ref_label}</Label>
+                      <Textarea 
+                        id="ext-reference" 
+                        placeholder={t.transfers.ref_ph} 
+                        value={reference}
+                        onChange={(e) => setReference(e.target.value)}
+                      />
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button type="submit" className="w-full glow-indigo" disabled={isProcessing}>
+                      {isProcessing ? <Loader2 className="animate-spin mr-2" /> : t.transfers.review_btn}
+                    </Button>
+                  </CardFooter>
+                </form>
+              </Card>
+           )}
+
+           {step === 3 && (
+              <div className="space-y-6 animate-in zoom-in-95 duration-500">
+                <Card className="border-2 border-amber-500 bg-amber-500/5">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-amber-500">
+                      <AlertTriangle />
+                      Revisión Requerida
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm leading-relaxed">Las transferencias a otras instituciones financieras requieren aprobación manual por nuestro departamento de prevención de fraudes.</p>
+                    <div className="bg-background/50 p-6 rounded-xl space-y-3 border border-white/5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Destinatario:</span>
+                        <span className="font-bold">{externalAccountName}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Banco:</span>
+                        <span className="font-bold">{externalBank}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-white/5">
+                        <span className="text-muted-foreground text-xs">{t.transfers.net_amount}</span>
+                        <span className="font-headline font-bold text-2xl text-accent">${parseFloat(amount).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex gap-4">
+                    <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>{t.common.edit}</Button>
+                    <Button 
+                      className="flex-1 bg-amber-500 hover:bg-amber-600 text-white" 
+                      onClick={confirmTransfer}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? <Loader2 className="animate-spin mr-2" /> : t.transfers.confirm_btn}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </div>
+            )}
+
+            {step === 4 && (
+              <Card className="text-center p-12 animate-in zoom-in-95 duration-700">
+                <CardContent className="space-y-6">
+                  <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="text-amber-500" size={40} />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-headline font-bold text-amber-500">Transferencia en Proceso</h2>
+                    <p className="text-muted-foreground">
+                      Tu transferencia de ${parseFloat(amount).toFixed(2)} a {externalAccountName} ha sido recibida y será revisada en las próximas horas laborables.
+                    </p>
+                  </div>
+                  <Button className="w-full glow-indigo" onClick={() => {
+                    setStep(1);
+                    setAmount('');
+                    setSearchQuery('');
+                    setRecipientUser(null);
+                    setReference('');
+                    setAiCategory('Transfer');
+                    setExternalBank('');
+                    setExternalAccountName('');
+                    setExternalAccountNumber('');
                   }}>
                     {t.transfers.another_transfer}
                   </Button>
