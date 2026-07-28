@@ -739,12 +739,23 @@ export default function TransfersPage() {
                   <CardContent className="space-y-6">
                     <div className="space-y-2">
                       <Label>Banco Destino</Label>
-                      <Input 
-                        placeholder="Ej. Chase, Bank of America, Wells Fargo..." 
-                        value={externalBank}
-                        onChange={(e) => setExternalBank(e.target.value)}
-                        required
-                      />
+                      <Select value={externalBank} onValueChange={setExternalBank} required>
+                        <SelectTrigger className="bg-background/50">
+                          <SelectValue placeholder="Selecciona el banco" />
+                        </SelectTrigger>
+                        <SelectContent className="glass max-h-64">
+                          <SelectItem value="Bank of America">Bank of America</SelectItem>
+                          <SelectItem value="Chase Bank">Chase Bank</SelectItem>
+                          <SelectItem value="Wells Fargo">Wells Fargo</SelectItem>
+                          <SelectItem value="Citibank">Citibank</SelectItem>
+                          <SelectItem value="Capital One">Capital One</SelectItem>
+                          <SelectItem value="PNC Bank">PNC Bank</SelectItem>
+                          <SelectItem value="US Bank">US Bank</SelectItem>
+                          <SelectItem value="Truist">Truist</SelectItem>
+                          <SelectItem value="TD Bank">TD Bank</SelectItem>
+                          <SelectItem value="Otro">Otro Banco</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     
                     <div className="space-y-2">
