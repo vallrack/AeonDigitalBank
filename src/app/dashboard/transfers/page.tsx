@@ -744,15 +744,32 @@ export default function TransfersPage() {
                           <SelectValue placeholder="Selecciona el banco" />
                         </SelectTrigger>
                         <SelectContent className="glass max-h-64">
-                          <SelectItem value="Bank of America">Bank of America</SelectItem>
-                          <SelectItem value="Chase Bank">Chase Bank</SelectItem>
-                          <SelectItem value="Wells Fargo">Wells Fargo</SelectItem>
-                          <SelectItem value="Citibank">Citibank</SelectItem>
-                          <SelectItem value="Capital One">Capital One</SelectItem>
-                          <SelectItem value="PNC Bank">PNC Bank</SelectItem>
-                          <SelectItem value="US Bank">US Bank</SelectItem>
-                          <SelectItem value="Truist">Truist</SelectItem>
-                          <SelectItem value="TD Bank">TD Bank</SelectItem>
+                          {/* EE.UU. */}
+                          <SelectItem value="Bank of America">Bank of America (EE.UU.)</SelectItem>
+                          <SelectItem value="Chase Bank">Chase Bank (EE.UU.)</SelectItem>
+                          <SelectItem value="Wells Fargo">Wells Fargo (EE.UU.)</SelectItem>
+                          <SelectItem value="Citibank">Citibank (EE.UU.)</SelectItem>
+                          
+                          {/* Colombia */}
+                          <SelectItem value="Bancolombia">Bancolombia (Colombia)</SelectItem>
+                          <SelectItem value="Davivienda">Davivienda (Colombia)</SelectItem>
+                          <SelectItem value="Banco de Bogotá">Banco de Bogotá (Colombia)</SelectItem>
+                          <SelectItem value="BBVA Colombia">BBVA (Colombia)</SelectItem>
+                          
+                          {/* México */}
+                          <SelectItem value="BBVA México">BBVA (México)</SelectItem>
+                          <SelectItem value="Banorte">Banorte (México)</SelectItem>
+                          <SelectItem value="Santander México">Santander (México)</SelectItem>
+                          <SelectItem value="Citibanamex">Citibanamex (México)</SelectItem>
+                          <SelectItem value="Banco Azteca">Banco Azteca (México)</SelectItem>
+
+                          {/* Otros Internacionales */}
+                          <SelectItem value="Banco de Crédito del Perú">BCP (Perú)</SelectItem>
+                          <SelectItem value="Banco de Chile">Banco de Chile</SelectItem>
+                          <SelectItem value="Santander España">Santander (España)</SelectItem>
+                          <SelectItem value="BBVA España">BBVA (España)</SelectItem>
+                          <SelectItem value="HSBC">HSBC (Global)</SelectItem>
+
                           <SelectItem value="Otro">Otro Banco</SelectItem>
                         </SelectContent>
                       </Select>
