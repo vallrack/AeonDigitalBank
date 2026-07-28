@@ -310,6 +310,7 @@ export default function TransfersPage() {
         batch.update(senderRef, { status: 'frozen' });
       }
 
+      const senderTxRef = doc(collection(db, 'users', user.uid, 'transactions'));
       const recipientRef = activeTransferType === 'zelle' ? doc(db, 'users', recipientUser.uid) : null;
 
       const senderField = sourceAccount === 'checking' ? 'checkingBalance' : 'savingsBalance';
